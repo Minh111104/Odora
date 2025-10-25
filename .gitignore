@@ -1,0 +1,28 @@
+node_modules/
+.expo/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# macOS
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+
+# API Configuration (contains API keys)
+config.js
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

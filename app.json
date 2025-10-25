@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "Odora",
+    "slug": "odora",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFF8F0"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Odora needs camera access to capture your food memories.",
+        "NSMicrophoneUsageDescription": "Odora needs microphone access to record ambient sounds.",
+        "NSPhotoLibraryUsageDescription": "Odora needs photo library access to save and retrieve your memories."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFF8F0"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Odora needs camera access to capture your food memories."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Odora needs microphone access to record ambient sounds."
+        }
+      ],
+      "expo-asset",
+      "expo-audio"
+    ]
+  }
+}
