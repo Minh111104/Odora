@@ -57,6 +57,22 @@ export default function HomeScreen({ navigation }) {
             day: 'numeric',
           })}
         </Text>
+        {item.reminderRating && (
+          <View style={styles.ratingContainer}>
+            {[...Array(5)].map((_, index) => {
+              const starValue = index + 1;
+              const rating = item.reminderRating || 0;
+
+              if (rating >= starValue) {
+                return <Ionicons key={index} name="star" size={12} color="#FFD700" />;
+              } else if (rating >= starValue - 0.5) {
+                return <Ionicons key={index} name="star-half" size={12} color="#FFD700" />;
+              } else {
+                return <Ionicons key={index} name="star-outline" size={12} color="#FFD700" />;
+              }
+            })}
+          </View>
+        )}
         {item.tags && item.tags.length > 0 && (
           <View style={styles.tagContainer}>
             <Text style={styles.tag} numberOfLines={1}>
@@ -167,6 +183,11 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 12,
     fontWeight: '600',
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    marginTop: spacing.xs,
+    gap: 2,
   },
   tagContainer: {
     marginTop: spacing.xs,

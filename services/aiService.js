@@ -14,7 +14,7 @@ const openai = new OpenAI({
 export async function generateScentDescription(imageBase64) {
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4-vision-preview',
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'user',
@@ -57,7 +57,7 @@ export async function generateScentDescription(imageBase64) {
 export async function suggestScentProducts(scentDescription) {
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'user',

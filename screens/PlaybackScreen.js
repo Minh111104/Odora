@@ -16,7 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, typography, shadows } from '../constants/theme';
-import { getMemoryById, rateMemory } from '../services/storageService';
+import { getMemoryById, rateMemory, deleteMemory } from '../services/storageService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -131,6 +131,33 @@ export default function PlaybackScreen({ route, navigation }) {
     }
   };
 
+  const handleDelete = () => {
+    Alert.alert(
+      'Delete Memory',
+      'Are you sure you want to delete this memory? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteMemory(memoryId);
+              await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              navigation.goBack();
+            } catch (error) {
+              console.error('Error deleting memory:', error);
+              Alert.alert('Error', 'Failed to delete memory');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (!memory) {
     return (
       <View style={styles.container}>
@@ -169,6 +196,9 @@ export default function PlaybackScreen({ route, navigation }) {
               year: 'numeric',
             })}
           </Text>
+          <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+            <Ionicons name="trash-outline" size={24} color="#FFF" />
+          </TouchableOpacity>
         </View>
 
         {/* Main Photo Card */}
@@ -234,21 +264,40 @@ export default function PlaybackScreen({ route, navigation }) {
         <View style={styles.ratingSection}>
           <Text style={styles.ratingTitle}>How well did this trigger your scent memory?</Text>
           <View style={styles.stars}>
-            {[1, 2, 3, 4, 5].map(star => (
-              <TouchableOpacity
-                key={star}
-                onPress={() => handleRating(star)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons
-                  name={rating >= star ? 'star' : 'star-outline'}
-                  size={36}
-                  color={rating >= star ? colors.secondary : colors.textLight}
-                  style={styles.star}
-                />
-              </TouchableOpacity>
-            ))}
+            {[1, 2, 3, 4, 5].map(star => {
+              const isFullStar = rating >= star;
+              const isHalfStar = rating === star - 0.5;
+
+              return (
+                <View key={star} style={styles.starContainer}>
+                  <TouchableOpacity
+                    style={styles.starButton}
+                    onPress={() => handleRating(star)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={isFullStar ? 'star' : isHalfStar ? 'star-half' : 'star-outline'}
+                      size={40}
+                      color={isFullStar || isHalfStar ? '#FFD700' : colors.textLight}
+                    />
+                  </TouchableOpacity>
+                  {/* Half star button overlay (invisible, positioned on left half) */}
+                  {star > 1 && (
+                    <TouchableOpacity
+                      style={styles.halfStarButton}
+                      onPress={() => handleRating(star - 0.5)}
+                      activeOpacity={0.7}
+                    />
+                  )}
+                </View>
+              );
+            })}
           </View>
+          {rating && (
+            <Text style={styles.ratingText}>
+              {rating} {rating === 1 ? 'star' : 'stars'}
+            </Text>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -292,10 +341,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  deleteButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,59,48,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   date: {
     color: '#FFF',
     ...typography.body,
     fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
   },
   photoCard: {
     borderRadius: 20,
@@ -390,9 +449,28 @@ const styles = StyleSheet.create({
   },
   stars: {
     flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center',
   },
-  star: {
-    marginHorizontal: spacing.xs,
+  starContainer: {
+    position: 'relative',
+  },
+  starButton: {
+    padding: spacing.xs,
+  },
+  halfStarButton: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: '50%',
+    zIndex: 1,
+  },
+  ratingText: {
+    color: colors.text,
+    ...typography.small,
+    marginTop: spacing.sm,
+    fontWeight: '600',
   },
   loadingText: {
     color: '#FFF',
