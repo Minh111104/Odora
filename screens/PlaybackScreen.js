@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, typography, shadows } from '../constants/theme';
 import { getMemoryById, rateMemory, deleteMemory } from '../services/storageService';
+import { speakWithElevenLabs, isElevenLabsConfigured } from '../services/ttsService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,6 +28,7 @@ export default function PlaybackScreen({ route, navigation }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [sound, setSound] = useState(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [ttsSound, setTtsSound] = useState(null);
   const [rating, setRating] = useState(null);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -53,6 +55,9 @@ export default function PlaybackScreen({ route, navigation }) {
     return () => {
       if (sound) {
         sound.unloadAsync();
+      }
+      if (ttsSound) {
+        ttsSound.unloadAsync();
       }
       Speech.stop();
     };
@@ -98,7 +103,13 @@ export default function PlaybackScreen({ route, navigation }) {
 
   const speakDescription = async () => {
     try {
+      // Stop if already speaking
       if (isSpeaking) {
+        if (ttsSound) {
+          await ttsSound.stopAsync();
+          await ttsSound.unloadAsync();
+          setTtsSound(null);
+        }
         Speech.stop();
         setIsSpeaking(false);
         return;
@@ -108,17 +119,44 @@ export default function PlaybackScreen({ route, navigation }) {
 
       const description = memory?.customDescription || memory?.scentDescription;
 
-      Speech.speak(description, {
-        language: 'en',
-        pitch: 1.0,
-        rate: 0.85, // Slightly slower for a calming effect
-        onStart: () => setIsSpeaking(true),
-        onDone: () => setIsSpeaking(false),
-        onStopped: () => setIsSpeaking(false),
-      });
+      // Use ElevenLabs if configured, otherwise fallback to expo-speech
+      if (isElevenLabsConfigured()) {
+        try {
+          setIsSpeaking(true);
+          const sound = await speakWithElevenLabs(description);
+          setTtsSound(sound);
+
+          // Set up playback status listener
+          sound.setOnPlaybackStatusUpdate(status => {
+            if (status.didJustFinish) {
+              setIsSpeaking(false);
+              setTtsSound(null);
+            }
+          });
+        } catch (error) {
+          console.error('ElevenLabs TTS failed, falling back to expo-speech:', error);
+          // Fallback to expo-speech
+          useFallbackTTS(description);
+        }
+      } else {
+        // Use expo-speech if ElevenLabs is not configured
+        useFallbackTTS(description);
+      }
     } catch (error) {
       console.error('Error with text-to-speech:', error);
+      setIsSpeaking(false);
     }
+  };
+
+  const useFallbackTTS = description => {
+    Speech.speak(description, {
+      language: 'en',
+      pitch: 1.0,
+      rate: 0.85, // Slightly slower for a calming effect
+      onStart: () => setIsSpeaking(true),
+      onDone: () => setIsSpeaking(false),
+      onStopped: () => setIsSpeaking(false),
+    });
   };
 
   const handleRating = async newRating => {
