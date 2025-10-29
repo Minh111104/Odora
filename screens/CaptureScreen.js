@@ -10,7 +10,7 @@ import {
   Animated,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useAudioRecorder, RecordingPresets, setAudioModeAsync } from 'expo-audio';
+import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,13 +21,16 @@ import { saveMemory } from '../services/storageService';
 
 export default function CaptureScreen({ navigation }) {
   const [permission, requestPermission] = useCameraPermissions();
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   const [capturedImage, setCapturedImage] = useState(null);
   const [audioUri, setAudioUri] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [playbackSound, setPlaybackSound] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioPermission, setAudioPermission] = useState(null);
+  const [recording, setRecording] = useState(null);
 
   const cameraRef = useRef(null);
   const recordingTimer = useRef(null);
@@ -40,11 +43,18 @@ export default function CaptureScreen({ navigation }) {
       if (!permission?.granted) {
         await requestPermission();
       }
+
+      // Request audio recording permission
+      const audioStatus = await Audio.requestPermissionsAsync();
+      setAudioPermission(audioStatus);
     })();
 
     return () => {
       if (recordingTimer.current) {
         clearInterval(recordingTimer.current);
+      }
+      if (playbackSound) {
+        playbackSound.unloadAsync?.();
       }
     };
   }, []);
@@ -108,16 +118,30 @@ export default function CaptureScreen({ navigation }) {
 
   const startRecording = async () => {
     try {
+      // Check audio permission first
+      if (!audioPermission?.granted) {
+        const { granted } = await Audio.requestPermissionsAsync();
+        setAudioPermission({ granted });
+        if (!granted) {
+          Alert.alert('Permission Required', 'Microphone permission is required to record audio');
+          return;
+        }
+      }
+
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
       // Set audio mode to allow recording on iOS
-      await setAudioModeAsync({
-        allowsRecording: true,
-        playsInSilentMode: true,
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
       });
 
-      await audioRecorder.record();
+      console.log('Starting recording with expo-av...');
+      const { recording: newRecording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
 
+      setRecording(newRecording);
       setIsRecording(true);
       setRecordingDuration(0);
       startRecordingPulse();
@@ -135,18 +159,26 @@ export default function CaptureScreen({ navigation }) {
       }, 1000);
     } catch (error) {
       console.error('Error starting recording:', error);
-      Alert.alert('Error', 'Failed to start recording');
+      Alert.alert('Error', 'Failed to start recording: ' + error.message);
     }
   };
 
   const stopRecording = async () => {
     try {
-      if (!audioRecorder.isRecording) return;
+      if (!recording) return;
 
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const uri = await audioRecorder.stop();
+
+      console.log('Stopping recording...');
+      await recording.stopAndUnloadAsync();
+
+      // Get the URI from the recording
+      const uri = recording.getURI();
+
+      console.log('Recording stopped, URI:', uri);
 
       setAudioUri(uri);
+      setRecording(null);
       setIsRecording(false);
       stopRecordingPulse();
 
@@ -155,6 +187,83 @@ export default function CaptureScreen({ navigation }) {
       }
     } catch (error) {
       console.error('Error stopping recording:', error);
+      Alert.alert('Error', 'Failed to stop recording: ' + error.message);
+    }
+  };
+
+  const playRecording = async () => {
+    try {
+      if (!audioUri) {
+        Alert.alert('No Recording', 'No audio recording found');
+        return;
+      }
+
+      console.log('Playing recording from URI:', audioUri);
+
+      if (isPlaying && playbackSound) {
+        // Stop playback
+        console.log('Stopping playback...');
+        await playbackSound.stopAsync();
+        await playbackSound.unloadAsync();
+        setPlaybackSound(null);
+        setIsPlaying(false);
+      } else {
+        // Unload any existing sound first
+        if (playbackSound) {
+          await playbackSound.unloadAsync();
+          setPlaybackSound(null);
+        }
+
+        // Configure audio mode for playback
+        console.log('Setting audio mode for playback...');
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
+
+        console.log('Creating sound from URI...');
+        // Create and play the sound
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: audioUri },
+          { shouldPlay: true, volume: 1.0 },
+          status => {
+            // Playback status update callback
+            if (status.isLoaded) {
+              console.log('Playback status:', {
+                isPlaying: status.isPlaying,
+                positionMillis: status.positionMillis,
+                durationMillis: status.durationMillis,
+              });
+
+              if (status.didJustFinish) {
+                console.log('Playback finished');
+                setIsPlaying(false);
+                sound.unloadAsync();
+                setPlaybackSound(null);
+              }
+            } else if (status.error) {
+              console.error('Playback error:', status.error);
+              Alert.alert('Playback Error', status.error);
+              setIsPlaying(false);
+            }
+          }
+        );
+
+        console.log('Sound created and playing');
+        setPlaybackSound(sound);
+        setIsPlaying(true);
+      }
+    } catch (error) {
+      console.error('Error playing recording:', error);
+      Alert.alert('Error', 'Failed to play recording: ' + error.message);
+      setIsPlaying(false);
+      if (playbackSound) {
+        await playbackSound.unloadAsync();
+        setPlaybackSound(null);
+      }
     }
   };
 
@@ -188,12 +297,18 @@ export default function CaptureScreen({ navigation }) {
     return <View style={styles.container} />;
   }
 
-  if (!permission.granted) {
+  if (!permission?.granted || !audioPermission?.granted) {
     return (
       <View style={styles.container}>
         <Text style={styles.permissionText}>Camera and microphone permissions are required</Text>
-        <TouchableOpacity onPress={requestPermission}>
-          <Text style={styles.permissionButton}>Grant Permission</Text>
+        <TouchableOpacity
+          onPress={async () => {
+            await requestPermission();
+            const audioStatus = await Audio.requestPermissionsAsync();
+            setAudioPermission(audioStatus);
+          }}
+        >
+          <Text style={styles.permissionButton}>Grant Permissions</Text>
         </TouchableOpacity>
       </View>
     );
@@ -211,6 +326,13 @@ export default function CaptureScreen({ navigation }) {
               <View style={styles.audioRecorded}>
                 <Ionicons name="checkmark-circle" size={24} color={colors.success} />
                 <Text style={styles.audioText}>Audio Recorded ({recordingDuration}s)</Text>
+                <TouchableOpacity style={styles.playButton} onPress={playRecording}>
+                  <Ionicons
+                    name={isPlaying ? 'pause-circle' : 'play-circle'}
+                    size={32}
+                    color={colors.primary}
+                  />
+                </TouchableOpacity>
               </View>
             ) : (
               <TouchableOpacity
@@ -236,10 +358,15 @@ export default function CaptureScreen({ navigation }) {
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={styles.retakeButton}
-              onPress={() => {
+              onPress={async () => {
                 setCapturedImage(null);
                 setAudioUri(null);
                 setRecordingDuration(0);
+                if (playbackSound) {
+                  await playbackSound.unloadAsync();
+                  setPlaybackSound(null);
+                }
+                setIsPlaying(false);
               }}
             >
               <Text style={styles.retakeText}>Retake</Text>
@@ -373,7 +500,11 @@ const styles = StyleSheet.create({
   audioText: {
     color: '#FFF',
     marginLeft: spacing.sm,
+    marginRight: spacing.md,
     ...typography.body,
+  },
+  playButton: {
+    marginLeft: spacing.sm,
   },
   actionButtons: {
     flexDirection: 'row',
