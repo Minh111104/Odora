@@ -268,15 +268,37 @@ export default function PlaybackScreen({ route, navigation }) {
           <Text style={styles.descriptionTitle}>Scent Memory</Text>
           <Text style={styles.description}>{description}</Text>
 
-          {/* TTS Button */}
-          <TouchableOpacity style={styles.ttsButton} onPress={speakDescription} activeOpacity={0.7}>
-            <Ionicons
-              name={isSpeaking ? 'stop-circle' : 'play-circle'}
-              size={24}
-              color={colors.primary}
-            />
-            <Text style={styles.ttsText}>{isSpeaking ? 'Stop Reading' : 'Read Aloud'}</Text>
-          </TouchableOpacity>
+          {/* Action Buttons Row */}
+          <View style={styles.actionButtonsRow}>
+            {/* TTS Button */}
+            <TouchableOpacity
+              style={styles.ttsButton}
+              onPress={speakDescription}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={isSpeaking ? 'stop-circle' : 'play-circle'}
+                size={24}
+                color={colors.primary}
+              />
+              <Text style={styles.ttsText}>{isSpeaking ? 'Stop' : 'Read Aloud'}</Text>
+            </TouchableOpacity>
+
+            {/* 3D View Button */}
+            <TouchableOpacity
+              style={styles.arButton}
+              onPress={() =>
+                navigation.navigate('ARView', {
+                  photoUri: memory.photoUri,
+                  scentDescription: description,
+                })
+              }
+              activeOpacity={0.7}
+            >
+              <Ionicons name="cube-outline" size={24} color={colors.accent} />
+              <Text style={styles.arText}>3D View</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Audio Playback */}
@@ -440,7 +462,12 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: spacing.md,
   },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
   ttsButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -450,6 +477,20 @@ const styles = StyleSheet.create({
   },
   ttsText: {
     color: colors.primary,
+    marginLeft: spacing.sm,
+    fontWeight: '600',
+  },
+  arButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.sm,
+    backgroundColor: colors.background,
+    borderRadius: 12,
+  },
+  arText: {
+    color: colors.accent,
     marginLeft: spacing.sm,
     fontWeight: '600',
   },
