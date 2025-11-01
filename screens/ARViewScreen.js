@@ -10,6 +10,7 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -524,9 +525,13 @@ export default function ARViewScreen({ route, navigation }) {
             <Ionicons name="flower-outline" size={20} color={colors.primary} />
             <Text style={styles.descriptionTitle}>Scent Analysis</Text>
           </View>
-          <Text style={styles.descriptionText} numberOfLines={3}>
-            {scentDescription}
-          </Text>
+          <ScrollView
+            style={styles.descriptionScrollView}
+            showsVerticalScrollIndicator={true}
+            persistentScrollbar={true}
+          >
+            <Text style={styles.descriptionText}>{scentDescription}</Text>
+          </ScrollView>
         </BlurView>
       )}
 
@@ -646,6 +651,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: 16,
     overflow: 'hidden',
+    maxHeight: 150,
   },
   descriptionHeader: {
     flexDirection: 'row',
@@ -658,10 +664,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: spacing.sm,
   },
+  descriptionScrollView: {
+    maxHeight: 80,
+  },
   descriptionText: {
     color: 'rgba(255,255,255,0.8)',
     fontSize: 12,
-    lineHeight: 16,
+    lineHeight: 18,
   },
   controls: {
     flexDirection: 'row',
