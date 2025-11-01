@@ -24,11 +24,8 @@ const { width } = Dimensions.get('window');
 export default function ARViewScreen({ route, navigation }) {
   const { photoUri, scentDescription } = route.params;
 
-  const [viewMode, setViewMode] = useState('ritual'); // 'ritual', 'ar', 'zoom', '3d'
+  const [viewMode, setViewMode] = useState('ritual'); // 'ritual', 'ar', 'zoom'
   const [scale, setScale] = useState(1);
-  const [isGenerating3D, setIsGenerating3D] = useState(false);
-  const [generated3DImages, setGenerated3DImages] = useState(null);
-  const [currentAngle, setCurrentAngle] = useState(0);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [arPlaced, setArPlaced] = useState(false);
   const [showSteam, setShowSteam] = useState(true);
@@ -841,24 +838,10 @@ export default function ARViewScreen({ route, navigation }) {
     outputRange: [0.7, 1],
   });
 
-  // Get current image based on angle for 3D mode
+  // Get current image based on mode
   const getCurrentImageUri = () => {
-    if (viewMode === '3d' && generated3DImages) {
-      const angleIndex = Math.floor(currentAngle);
-      return generated3DImages[angleIndex] || generated3DImages[0];
-    }
     return photoUri;
   };
-
-  // Update current angle when animation value changes
-  React.useEffect(() => {
-    if (viewMode === '3d') {
-      const listenerId = angleAnim.addListener(({ value }) => {
-        setCurrentAngle(value % 4); // Cycle through 0-3
-      });
-      return () => angleAnim.removeListener(listenerId);
-    }
-  }, [viewMode]);
 
   return (
     <View style={styles.container}>
@@ -1259,18 +1242,6 @@ export default function ARViewScreen({ route, navigation }) {
               ]}
             >
               <Image source={{ uri: getCurrentImageUri() }} style={styles.image} />
-
-              {/* 3D Mode indicator */}
-              {viewMode === '3d' && generated3DImages && (
-                <View style={styles.angleIndicator}>
-                  <Text style={styles.angleText}>
-                    {currentAngle < 1 && '📸 Front View'}
-                    {currentAngle >= 1 && currentAngle < 2 && '📐 45° Angle'}
-                    {currentAngle >= 2 && currentAngle < 3 && '👉 Side View'}
-                    {currentAngle >= 3 && '⬇️ Top View'}
-                  </Text>
-                </View>
-              )}
             </Animated.View>
           )}
         </View>
@@ -1303,16 +1274,6 @@ export default function ARViewScreen({ route, navigation }) {
           />
           <Text style={[styles.viewModeText, viewMode === 'ar' && styles.viewModeTextActive]}>
             AR
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.viewModeButton, viewMode === '3d' && styles.viewModeActive]}
-          onPress={() => switchViewMode('3d')}
-        >
-          <Ionicons name="cube" size={18} color={viewMode === '3d' ? colors.primary : '#FFF'} />
-          <Text style={[styles.viewModeText, viewMode === '3d' && styles.viewModeTextActive]}>
-            AI 3D
           </Text>
         </TouchableOpacity>
 
@@ -1375,7 +1336,6 @@ export default function ARViewScreen({ route, navigation }) {
                 ? '🔮 Generating 8-angle hologram...'
                 : '🔮 3D Hologram active • Swipe to rotate'
               : '📍 Point at surface • Tap to project hologram')}
-          {viewMode === '3d' && '🎬 AI-generated 360° views • Watch it rotate'}
           {viewMode === 'zoom' && '🔍 Examining details • Pinch to zoom'}
         </Text>
       </View>
@@ -1538,20 +1498,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     fontSize: 14,
     marginTop: spacing.xs,
-  },
-  angleIndicator: {
-    position: 'absolute',
-    top: -50,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(255,140,66,0.9)',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: 20,
-  },
-  angleText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
   },
   // AR Mode Styles
   arOverlay: {
