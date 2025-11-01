@@ -14,7 +14,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing } from '../constants/theme';
 import { generateScentDescription } from '../services/aiService';
@@ -24,14 +23,8 @@ const { width } = Dimensions.get('window');
 export default function ARViewScreen({ route, navigation }) {
   const { photoUri, scentDescription } = route.params;
 
-  const [viewMode, setViewMode] = useState('ritual'); // 'ritual', 'ar', 'zoom'
+  const [viewMode, setViewMode] = useState('ritual'); // 'ritual', 'zoom'
   const [scale, setScale] = useState(1);
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const [arPlaced, setArPlaced] = useState(false);
-  const [showSteam, setShowSteam] = useState(true);
-  const [hologramAngles, setHologramAngles] = useState(null);
-  const [isGeneratingHologram, setIsGeneratingHologram] = useState(false);
-  const [currentHologramAngle, setCurrentHologramAngle] = useState(0); // 0-7 for 8 angles
   const [ritualStep, setRitualStep] = useState(0); // 0: placement, 1: served, 2: eating, 3: complete
   const [ritualPlaced, setRitualPlaced] = useState(false);
 
@@ -39,173 +32,12 @@ export default function ARViewScreen({ route, navigation }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
-  const angleAnim = useRef(new Animated.Value(0)).current;
-  const steamAnim = useRef(new Animated.Value(0)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
-  const floatAnim = useRef(new Animated.Value(0)).current;
-  const shadowAnim = useRef(new Animated.Value(0)).current;
-  const hologramRotation = useRef(new Animated.Value(0)).current;
-  const hologramFlicker = useRef(new Animated.Value(1)).current;
-  const scanlineAnim = useRef(new Animated.Value(0)).current;
   const ritualGlowAnim = useRef(new Animated.Value(0)).current;
   const handServeAnim = useRef(new Animated.Value(0)).current;
   const forkAnim = useRef(new Animated.Value(0)).current;
   const plateSettleAnim = useRef(new Animated.Value(0)).current;
   const vignetteAnim = useRef(new Animated.Value(0)).current;
   const foodGrowAnim = useRef(new Animated.Value(0)).current;
-
-  // Pulse animation for focus mode
-  React.useEffect(() => {
-    if (viewMode === 'zoom') {
-      const pulse = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.05,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      pulse.start();
-      return () => pulse.stop();
-    }
-  }, [viewMode]);
-
-  // AR Mode animations (steam, glow, float)
-  React.useEffect(() => {
-    if (viewMode === 'ar') {
-      // Steam rising effect
-      const steam = Animated.loop(
-        Animated.sequence([
-          Animated.timing(steamAnim, {
-            toValue: 1,
-            duration: 3000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(steamAnim, {
-            toValue: 0,
-            duration: 0,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-
-      // Glow pulse
-      const glow = Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 2000,
-            useNativeDriver: false,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0,
-            duration: 2000,
-            useNativeDriver: false,
-          }),
-        ])
-      );
-
-      // Subtle floating
-      const float = Animated.loop(
-        Animated.sequence([
-          Animated.timing(floatAnim, {
-            toValue: 1,
-            duration: 2500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(floatAnim, {
-            toValue: 0,
-            duration: 2500,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-
-      // Shadow pulse
-      const shadow = Animated.loop(
-        Animated.sequence([
-          Animated.timing(shadowAnim, {
-            toValue: 1,
-            duration: 2500,
-            useNativeDriver: false,
-          }),
-          Animated.timing(shadowAnim, {
-            toValue: 0,
-            duration: 2500,
-            useNativeDriver: false,
-          }),
-        ])
-      );
-
-      // Hologram rotation
-      const rotation = Animated.loop(
-        Animated.timing(hologramRotation, {
-          toValue: 1,
-          duration: 12000,
-          useNativeDriver: true,
-        })
-      );
-
-      // Hologram flicker effect
-      const flicker = Animated.loop(
-        Animated.sequence([
-          Animated.timing(hologramFlicker, {
-            toValue: 0.85,
-            duration: 100,
-            useNativeDriver: false,
-          }),
-          Animated.timing(hologramFlicker, {
-            toValue: 1,
-            duration: 100,
-            useNativeDriver: false,
-          }),
-          Animated.timing(hologramFlicker, {
-            toValue: 0.9,
-            duration: 150,
-            useNativeDriver: false,
-          }),
-          Animated.timing(hologramFlicker, {
-            toValue: 1,
-            duration: 2000,
-            useNativeDriver: false,
-          }),
-        ])
-      );
-
-      // Scanline animation
-      const scanline = Animated.loop(
-        Animated.timing(scanlineAnim, {
-          toValue: 1,
-          duration: 3000,
-          useNativeDriver: true,
-        })
-      );
-
-      steam.start();
-      glow.start();
-      float.start();
-      shadow.start();
-      rotation.start();
-      flicker.start();
-      scanline.start();
-
-      return () => {
-        steam.stop();
-        glow.stop();
-        float.stop();
-        shadow.stop();
-        rotation.stop();
-        flicker.stop();
-        scanline.stop();
-      };
-    }
-  }, [viewMode]);
 
   // Pulse animation for focus mode
   React.useEffect(() => {
@@ -359,20 +191,6 @@ export default function ARViewScreen({ route, navigation }) {
         useNativeDriver: true,
       }).start();
       setScale(2);
-    } else if (mode === '3d') {
-      // Generate 3D video when mode is selected
-      if (!generated3DImages) {
-        generate3DVideo();
-      } else {
-        start3DAnimation();
-      }
-    } else if (mode === 'ar') {
-      // Request camera permission for AR mode
-      if (!cameraPermission?.granted) {
-        requestCameraPermission();
-      }
-      setArPlaced(false);
-      handleReset();
     } else if (mode === 'ritual') {
       // Reset ritual state
       setRitualStep(0);
@@ -384,16 +202,6 @@ export default function ARViewScreen({ route, navigation }) {
       handleReset();
     } else {
       handleReset();
-    }
-  };
-
-  const handleArPlacement = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setArPlaced(true);
-
-    // Generate hologram angles if not already generated
-    if (!hologramAngles) {
-      generateHologramAngles();
     }
   };
 
@@ -460,341 +268,6 @@ export default function ARViewScreen({ route, navigation }) {
       setRitualStep(3);
       // Could trigger TTS scent description here
     }, 2000);
-  };
-  const generateHologramAngles = async () => {
-    setIsGeneratingHologram(true);
-    try {
-      Alert.alert(
-        '🔮 Generating Hologram',
-        'AI is analyzing your photo and creating realistic 3D angles. This may take 60-90 seconds...',
-        [{ text: 'OK' }]
-      );
-
-      // Step 1: Analyze the photo ONCE with GPT-4 Vision
-      const OpenAI = require('openai').default;
-      const { config } = require('../config');
-      const FileSystem = require('expo-file-system/legacy');
-
-      const openai = new OpenAI({
-        apiKey: config.OPENAI_API_KEY,
-      });
-
-      const base64Image = await FileSystem.readAsStringAsync(photoUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      console.log('Analyzing your food photo with AI...');
-      const visionResponse = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Describe this food in extreme detail for photorealistic recreation. Include: specific food items, exact colors, textures, ingredients visible, garnishes, plating presentation, plate/bowl type, and overall composition. Be very detailed and accurate.',
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:image/jpeg;base64,${base64Image}`,
-                },
-              },
-            ],
-          },
-        ],
-        max_tokens: 400,
-      });
-
-      const accurateFoodDescription = visionResponse.choices[0].message.content;
-      console.log('AI detected:', accurateFoodDescription);
-
-      // Step 2: Generate 8 angles using the accurate description
-      const angleInstructions = [
-        'straight-on front view',
-        '45-degree angle from the right side',
-        'direct right side view',
-        '135-degree back-right diagonal view',
-        'straight back view',
-        '225-degree back-left diagonal view',
-        'direct left side view',
-        '315-degree front-left diagonal view',
-      ];
-
-      const generatedAngles = await Promise.all(
-        angleInstructions.map(async (angleInstruction, index) => {
-          const enhancedPrompt = `${accurateFoodDescription}, photographed from a ${angleInstruction}, hyper-realistic professional food photography, studio lighting, commercial advertising quality, 4K resolution, appetizing presentation, sharp focus`;
-
-          console.log(`Generating angle ${index + 1}/8: ${angleInstruction}`);
-
-          const response = await openai.images.generate({
-            model: 'dall-e-3',
-            prompt: enhancedPrompt,
-            n: 1,
-            size: '1024x1024',
-            quality: 'hd', // HD quality for maximum realism
-          });
-
-          return response.data[0].url;
-        })
-      );
-
-      setHologramAngles(generatedAngles);
-      startHologramRotation();
-      setIsGeneratingHologram(false);
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert(
-        '✨ Hologram Ready!',
-        'Your AI-enhanced 3D food is ready! The hologram shows your actual dish from 8 different angles.',
-        [{ text: 'Amazing!' }]
-      );
-    } catch (error) {
-      console.error('Error generating hologram:', error);
-      setIsGeneratingHologram(false);
-      Alert.alert(
-        'Generation Failed',
-        'Could not generate hologram. Using original photo instead.',
-        [{ text: 'OK' }]
-      );
-    }
-  };
-
-  const startHologramRotation = () => {
-    // Listen to rotation animation and update current angle
-    hologramRotation.addListener(({ value }) => {
-      const angleIndex = Math.floor(value * 8) % 8;
-      setCurrentHologramAngle(angleIndex);
-    });
-  };
-
-  const generate3DVideo = async () => {
-    setIsGenerating3D(true);
-    try {
-      // Use AI to generate the food description for better prompts
-      const foodDescription = await extractFoodFromDescription(scentDescription);
-
-      Alert.alert(
-        '🎬 Generating 3D View',
-        `Creating realistic 360° views of your ${foodDescription}. This may take 30-60 seconds...`,
-        [{ text: 'OK' }]
-      );
-
-      // Generate 4 different angles using DALL-E
-      const angles = ['front view', '45 degree angle view', 'side view', 'top-down view'];
-
-      const generatedImages = await Promise.all(
-        angles.map(async angle => {
-          const prompt = `Professional food photography of ${foodDescription}, ${angle}, on a clean white plate, natural lighting, high quality, 4K, commercial food photography style, appetizing presentation`;
-
-          // Call OpenAI DALL-E to generate the image
-          const imageUrl = await generateFoodImage(prompt);
-          return imageUrl;
-        })
-      );
-
-      setGenerated3DImages(generatedImages);
-      start3DAnimation();
-      setIsGenerating3D(false);
-
-      Alert.alert(
-        '✨ 3D View Ready!',
-        'Your AI-generated 360° food view is ready. Watch it rotate automatically!',
-        [{ text: 'Awesome!' }]
-      );
-    } catch (error) {
-      console.error('Error generating 3D video:', error);
-      setIsGenerating3D(false);
-      Alert.alert(
-        'Generation Failed',
-        'Could not generate 3D views. Please check your API key and try again.',
-        [{ text: 'OK' }]
-      );
-      setViewMode('ar');
-    }
-  };
-
-  const extractFoodFromDescription = async description => {
-    // Extract main food item from scent description
-    const words = description.toLowerCase().split(' ');
-    const foodKeywords = [
-      'coffee',
-      'bread',
-      'cake',
-      'soup',
-      'rice',
-      'noodles',
-      'steak',
-      'salad',
-      'pasta',
-      'pizza',
-    ];
-
-    for (const word of words) {
-      if (foodKeywords.some(food => word.includes(food))) {
-        return word;
-      }
-    }
-
-    // Default fallback
-    return 'gourmet dish';
-  };
-
-  const generateFoodImage = async prompt => {
-    const OpenAI = require('openai').default;
-    const { config } = require('../config');
-
-    const openai = new OpenAI({
-      apiKey: config.OPENAI_API_KEY,
-    });
-
-    const response = await openai.images.generate({
-      model: 'dall-e-3',
-      prompt: prompt,
-      n: 1,
-      size: '1024x1024',
-      quality: 'standard',
-    });
-
-    return response.data[0].url;
-  };
-
-  const enhanceFoodPhotoWithAngle = async (imageUri, instruction) => {
-    const OpenAI = require('openai').default;
-    const { config } = require('../config');
-    const FileSystem = require('expo-file-system/legacy').default;
-
-    try {
-      const openai = new OpenAI({
-        apiKey: config.OPENAI_API_KEY,
-      });
-
-      // Step 1: Use GPT-4 Vision to analyze the actual photo
-      const base64Image = await FileSystem.readAsStringAsync(imageUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      console.log('Analyzing photo with GPT-4 Vision...');
-      const visionResponse = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Describe this food in extreme detail for food photography recreation. Include: exact food items, colors, textures, garnishes, plating style, lighting, and presentation. Be very specific and detailed.',
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:image/jpeg;base64,${base64Image}`,
-                },
-              },
-            ],
-          },
-        ],
-        max_tokens: 300,
-      });
-
-      const foodDescription = visionResponse.choices[0].message.content;
-      console.log('GPT-4 Vision analysis:', foodDescription);
-
-      // Step 2: Use the detailed description to generate the angle with DALL-E 3
-      const detailedPrompt = `${foodDescription}. ${instruction}. Hyper-realistic, professional food photography, studio lighting, 4K quality, commercial advertising style, mouth-watering presentation`;
-
-      console.log('Generating enhanced image with DALL-E 3...');
-      const response = await openai.images.generate({
-        model: 'dall-e-3',
-        prompt: detailedPrompt,
-        n: 1,
-        size: '1024x1024',
-        quality: 'hd', // Use HD quality for maximum realism
-      });
-
-      return response.data[0].url;
-    } catch (error) {
-      console.error('Image enhancement error:', error);
-
-      // Fallback: Use simpler generation
-      console.log('Falling back to simple enhancement...');
-      const openai = new OpenAI({
-        apiKey: config.OPENAI_API_KEY,
-      });
-
-      const fallbackPrompt = `Delicious gourmet food dish, ${instruction}, hyper-realistic food photography, professional studio lighting, commercial quality, 4K resolution, appetizing presentation`;
-
-      const response = await openai.images.generate({
-        model: 'dall-e-3',
-        prompt: fallbackPrompt,
-        n: 1,
-        size: '1024x1024',
-        quality: 'hd',
-      });
-
-      return response.data[0].url;
-    }
-  };
-
-  const start3DAnimation = () => {
-    // Cycle through the 4 generated images to create rotation effect
-    const cycleAnimation = Animated.loop(
-      Animated.timing(angleAnim, {
-        toValue: 3, // 0, 1, 2, 3 (4 images)
-        duration: 8000,
-        useNativeDriver: false,
-      })
-    );
-    cycleAnimation.start();
-  };
-
-  // AR animation interpolations
-  const steamTranslateY = steamAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -100],
-  });
-
-  const steamOpacity = steamAnim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0.6, 0.3, 0],
-  });
-
-  const glowOpacity = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, 0.8],
-  });
-
-  const floatTranslateY = floatAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -10],
-  });
-
-  const shadowScale = shadowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0.95],
-  });
-
-  const shadowOpacity = shadowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.5, 0.3],
-  });
-
-  const hologramRotationDeg = hologramRotation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  const scanlineTranslateY = scanlineAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-300, 300],
-  });
-
-  // Get current hologram image based on rotation angle
-  const getCurrentHologramImage = () => {
-    if (hologramAngles && hologramAngles.length === 8) {
-      return hologramAngles[currentHologramAngle];
-    }
-    return photoUri;
   };
 
   // Ritual mode interpolations
@@ -973,230 +446,8 @@ export default function ARViewScreen({ route, navigation }) {
             </View>
           )}
         </View>
-      ) : viewMode === 'ar' ? (
-        cameraPermission?.granted ? (
-          <CameraView style={StyleSheet.absoluteFill} facing="back">
-            {/* AR Overlay */}
-            <View style={styles.arOverlay}>
-              {/* Target reticle for placement */}
-              {!arPlaced && (
-                <View style={styles.targetContainer}>
-                  <View style={styles.targetReticle}>
-                    <View style={styles.targetLine} />
-                    <View style={[styles.targetLine, styles.targetLineVertical]} />
-                    <View style={styles.targetCircle} />
-                  </View>
-                  <Text style={styles.arInstructionText}>
-                    Point at a surface and tap to place food
-                  </Text>
-                </View>
-              )}
-
-              {/* Placed AR Food */}
-              {arPlaced && (
-                <Animated.View
-                  style={[
-                    styles.arFoodContainer,
-                    {
-                      transform: [
-                        { translateY: floatTranslateY },
-                        { scale: scaleAnim },
-                        { rotateY: hologramRotationDeg },
-                      ],
-                    },
-                  ]}
-                >
-                  {isGeneratingHologram ? (
-                    <View style={styles.hologramLoadingContainer}>
-                      <ActivityIndicator size="large" color="#00d4ff" />
-                      <Text style={styles.hologramLoadingText}>Analyzing Photo...</Text>
-                      <Text style={styles.hologramLoadingSubtext}>
-                        AI is enhancing your food with realistic 3D angles
-                      </Text>
-                    </View>
-                  ) : (
-                    <>
-                      {/* Hologram projection base */}
-                      <View style={styles.hologramBase}>
-                        <LinearGradient
-                          colors={['rgba(0,212,255,0.3)', 'rgba(0,212,255,0)']}
-                          style={styles.hologramBaseGradient}
-                        />
-                      </View>
-
-                      {/* Shadow under food */}
-                      <Animated.View
-                        style={[
-                          styles.arShadow,
-                          {
-                            transform: [{ scale: shadowScale }],
-                            opacity: shadowOpacity,
-                          },
-                        ]}
-                      />
-
-                      {/* Hologram glow layers (multiple for depth) */}
-                      <Animated.View
-                        style={[
-                          styles.hologramGlowOuter,
-                          {
-                            opacity: glowOpacity,
-                          },
-                        ]}
-                      />
-                      <Animated.View
-                        style={[
-                          styles.hologramGlowInner,
-                          {
-                            opacity: glowOpacity,
-                          },
-                        ]}
-                      />
-
-                      {/* Main Food Image with hologram effect */}
-                      <Animated.View
-                        style={[
-                          styles.hologramImageContainer,
-                          {
-                            opacity: hologramFlicker,
-                          },
-                        ]}
-                      >
-                        {/* Back layer for depth */}
-                        <Image
-                          source={{ uri: getCurrentHologramImage() }}
-                          style={[styles.arFoodImage, styles.hologramLayer, { opacity: 0.3 }]}
-                        />
-
-                        {/* Main layer */}
-                        <Image
-                          source={{ uri: getCurrentHologramImage() }}
-                          style={[styles.arFoodImage, styles.hologramEffect]}
-                        />
-
-                        {/* Front highlight layer */}
-                        <Image
-                          source={{ uri: getCurrentHologramImage() }}
-                          style={[
-                            styles.arFoodImage,
-                            styles.hologramLayer,
-                            { opacity: 0.2, tintColor: '#00d4ff' },
-                          ]}
-                        />
-
-                        {/* Hologram scanlines */}
-                        <Animated.View
-                          style={[
-                            styles.hologramScanline,
-                            {
-                              transform: [{ translateY: scanlineTranslateY }],
-                            },
-                          ]}
-                        />
-
-                        {/* Grid overlay for holographic effect */}
-                        <View style={styles.hologramGrid}>
-                          {[...Array(15)].map((_, i) => (
-                            <View
-                              key={`h-${i}`}
-                              style={[styles.hologramGridLineH, { top: `${(i / 14) * 100}%` }]}
-                            />
-                          ))}
-                          {[...Array(15)].map((_, i) => (
-                            <View
-                              key={`v-${i}`}
-                              style={[styles.hologramGridLineV, { left: `${(i / 14) * 100}%` }]}
-                            />
-                          ))}
-                        </View>
-
-                        {/* Edge glow */}
-                        <View style={styles.hologramEdgeGlow} />
-                      </Animated.View>
-
-                      {/* Hologram particles floating around */}
-                      <View style={styles.hologramParticlesContainer}>
-                        {[0, 1, 2, 3, 4].map(i => (
-                          <Animated.View
-                            key={i}
-                            style={[
-                              styles.hologramParticle,
-                              {
-                                left: `${20 + i * 15}%`,
-                                top: `${10 + (i % 3) * 30}%`,
-                                opacity: glowOpacity,
-                              },
-                            ]}
-                          />
-                        ))}
-                      </View>
-
-                      {/* AR Info Label with hologram style */}
-                      <BlurView intensity={50} style={styles.hologramLabel}>
-                        <View style={styles.hologramLabelContent}>
-                          <Ionicons name="radio-outline" size={16} color="#00d4ff" />
-                          <Text style={styles.hologramLabelText}>
-                            3D HOLOGRAM •{' '}
-                            {hologramAngles ? `${currentHologramAngle + 1}/8 ANGLES` : 'STANDARD'}
-                          </Text>
-                        </View>
-                      </BlurView>
-                    </>
-                  )}
-                </Animated.View>
-              )}
-
-              {/* AR Controls Overlay */}
-              {arPlaced && !isGeneratingHologram && (
-                <View style={styles.arControlsOverlay}>
-                  <TouchableOpacity
-                    style={styles.hologramActionButton}
-                    onPress={() => {
-                      const newAngle = (currentHologramAngle + 1) % 8;
-                      setCurrentHologramAngle(newAngle);
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }}
-                  >
-                    <Ionicons name="sync" size={24} color="#00d4ff" />
-                    <Text style={styles.hologramActionText}>Rotate</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.hologramActionButton}
-                    onPress={() => {
-                      setArPlaced(false);
-                      setHologramAngles(null);
-                      setCurrentHologramAngle(0);
-                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                    }}
-                  >
-                    <Ionicons name="refresh" size={24} color="#00d4ff" />
-                    <Text style={styles.hologramActionText}>Replace</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* Tap to place handler */}
-              {!arPlaced && (
-                <TouchableOpacity
-                  style={StyleSheet.absoluteFill}
-                  activeOpacity={1}
-                  onPress={handleArPlacement}
-                />
-              )}
-            </View>
-          </CameraView>
-        ) : (
-          <View style={styles.permissionContainer}>
-            <Ionicons name="camera-outline" size={80} color="rgba(255,255,255,0.5)" />
-            <Text style={styles.permissionText}>Camera access required for AR</Text>
-            <TouchableOpacity style={styles.permissionButton} onPress={requestCameraPermission}>
-              <Text style={styles.permissionButtonText}>Grant Permission</Text>
-            </TouchableOpacity>
-          </View>
-        )
       ) : (
-        /* Animated Background for non-AR and non-Ritual modes */
+        /* Animated Background for non-Ritual modes */
         <View style={StyleSheet.absoluteFill}>
           <LinearGradient
             colors={['#1a1a2e', '#16213e', '#0f3460']}
@@ -1219,31 +470,23 @@ export default function ARViewScreen({ route, navigation }) {
       {/* Main View Container (non-AR and non-Ritual modes) */}
       {viewMode !== 'ar' && viewMode !== 'ritual' && (
         <View style={styles.viewContainer} {...panResponder.panHandlers}>
-          {isGenerating3D ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.loadingText}>Generating AI 3D Views...</Text>
-              <Text style={styles.loadingSubtext}>Creating realistic angles</Text>
-            </View>
-          ) : (
-            <Animated.View
-              style={[
-                styles.imageWrapper,
-                {
-                  transform: [
-                    { translateX },
-                    { translateY },
-                    {
-                      scale:
-                        viewMode === 'zoom' ? Animated.multiply(scaleAnim, pulseAnim) : scaleAnim,
-                    },
-                  ],
-                },
-              ]}
-            >
-              <Image source={{ uri: getCurrentImageUri() }} style={styles.image} />
-            </Animated.View>
-          )}
+          <Animated.View
+            style={[
+              styles.imageWrapper,
+              {
+                transform: [
+                  { translateX },
+                  { translateY },
+                  {
+                    scale:
+                      viewMode === 'zoom' ? Animated.multiply(scaleAnim, pulseAnim) : scaleAnim,
+                  },
+                ],
+              },
+            ]}
+          >
+            <Image source={{ uri: getCurrentImageUri() }} style={styles.image} />
+          </Animated.View>
         </View>
       )}
 
@@ -1264,20 +507,6 @@ export default function ARViewScreen({ route, navigation }) {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.viewModeButton, viewMode === 'ar' && styles.viewModeActive]}
-          onPress={() => switchViewMode('ar')}
-        >
-          <Ionicons
-            name="cube-outline"
-            size={18}
-            color={viewMode === 'ar' ? colors.primary : '#FFF'}
-          />
-          <Text style={[styles.viewModeText, viewMode === 'ar' && styles.viewModeTextActive]}>
-            AR
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
           style={[styles.viewModeButton, viewMode === 'zoom' && styles.viewModeActive]}
           onPress={() => switchViewMode('zoom')}
         >
@@ -1288,8 +517,8 @@ export default function ARViewScreen({ route, navigation }) {
         </TouchableOpacity>
       </BlurView>
 
-      {/* Scent Description - Only show in non-AR and non-Ritual modes */}
-      {viewMode !== 'ar' && viewMode !== 'ritual' && (
+      {/* Scent Description - Only show in non-Ritual modes */}
+      {viewMode !== 'ritual' && (
         <BlurView intensity={80} style={styles.descriptionContainer}>
           <View style={styles.descriptionHeader}>
             <Ionicons name="flower-outline" size={20} color={colors.primary} />
@@ -1301,8 +530,8 @@ export default function ARViewScreen({ route, navigation }) {
         </BlurView>
       )}
 
-      {/* Controls - Only show in non-AR and non-Ritual modes */}
-      {viewMode !== 'ar' && viewMode !== 'ritual' && (
+      {/* Controls - Only show in non-Ritual modes */}
+      {viewMode !== 'ritual' && (
         <View style={styles.controls}>
           <TouchableOpacity style={styles.controlButton} onPress={handleZoomOut}>
             <Ionicons name="remove" size={24} color="#FFF" />
@@ -1330,12 +559,6 @@ export default function ARViewScreen({ route, navigation }) {
                 ? '🍴 Tap to take a bite'
                 : '❤️ Enjoy your memory'
               : '🍽️ Prepare your table ritual')}
-          {viewMode === 'ar' &&
-            (arPlaced
-              ? isGeneratingHologram
-                ? '🔮 Generating 8-angle hologram...'
-                : '🔮 3D Hologram active • Swipe to rotate'
-              : '📍 Point at surface • Tap to project hologram')}
           {viewMode === 'zoom' && '🔍 Examining details • Pinch to zoom'}
         </Text>
       </View>
