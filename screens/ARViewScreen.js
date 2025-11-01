@@ -24,7 +24,7 @@ const { width } = Dimensions.get('window');
 export default function ARViewScreen({ route, navigation }) {
   const { photoUri, scentDescription } = route.params;
 
-  const [viewMode, setViewMode] = useState('ar'); // 'ar', 'rotate', 'zoom', 'xray', '3d'
+  const [viewMode, setViewMode] = useState('ritual'); // 'ritual', 'ar', 'zoom', '3d'
   const [scale, setScale] = useState(1);
   const [isGenerating3D, setIsGenerating3D] = useState(false);
   const [generated3DImages, setGenerated3DImages] = useState(null);
@@ -35,13 +35,13 @@ export default function ARViewScreen({ route, navigation }) {
   const [hologramAngles, setHologramAngles] = useState(null);
   const [isGeneratingHologram, setIsGeneratingHologram] = useState(false);
   const [currentHologramAngle, setCurrentHologramAngle] = useState(0); // 0-7 for 8 angles
+  const [ritualStep, setRitualStep] = useState(0); // 0: placement, 1: served, 2: eating, 3: complete
+  const [ritualPlaced, setRitualPlaced] = useState(false);
 
-  const rotateAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
-  const colorShift = useRef(new Animated.Value(0)).current;
   const angleAnim = useRef(new Animated.Value(0)).current;
   const steamAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
@@ -50,19 +50,32 @@ export default function ARViewScreen({ route, navigation }) {
   const hologramRotation = useRef(new Animated.Value(0)).current;
   const hologramFlicker = useRef(new Animated.Value(1)).current;
   const scanlineAnim = useRef(new Animated.Value(0)).current;
+  const ritualGlowAnim = useRef(new Animated.Value(0)).current;
+  const handServeAnim = useRef(new Animated.Value(0)).current;
+  const forkAnim = useRef(new Animated.Value(0)).current;
+  const plateSettleAnim = useRef(new Animated.Value(0)).current;
+  const vignetteAnim = useRef(new Animated.Value(0)).current;
+  const foodGrowAnim = useRef(new Animated.Value(0)).current;
 
-  // Auto-rotate animation
+  // Pulse animation for focus mode
   React.useEffect(() => {
-    if (viewMode === 'rotate') {
-      const rotateAnimation = Animated.loop(
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 6000,
-          useNativeDriver: true,
-        })
+    if (viewMode === 'zoom') {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.05,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
       );
-      rotateAnimation.start();
-      return () => rotateAnimation.stop();
+      pulse.start();
+      return () => pulse.stop();
     }
   }, [viewMode]);
 
@@ -219,35 +232,49 @@ export default function ARViewScreen({ route, navigation }) {
     }
   }, [viewMode]);
 
-  // X-ray color shift animation
+  // Ritual Mode animations
   React.useEffect(() => {
-    if (viewMode === 'xray') {
-      const shift = Animated.loop(
+    if (viewMode === 'ritual' && ritualPlaced) {
+      // Gentle glow pulse
+      const glow = Animated.loop(
         Animated.sequence([
-          Animated.timing(colorShift, {
+          Animated.timing(ritualGlowAnim, {
             toValue: 1,
-            duration: 2000,
+            duration: 3000,
             useNativeDriver: false,
           }),
-          Animated.timing(colorShift, {
+          Animated.timing(ritualGlowAnim, {
             toValue: 0,
-            duration: 2000,
+            duration: 3000,
             useNativeDriver: false,
           }),
         ])
       );
-      shift.start();
-      return () => shift.stop();
-    }
-  }, [viewMode]);
 
-  // Pan responder for drag gestures (and hologram rotation in AR mode)
+      // Vignette darkening
+      Animated.timing(vignetteAnim, {
+        toValue: 1,
+        duration: 1500,
+        useNativeDriver: false,
+      }).start();
+
+      glow.start();
+
+      return () => {
+        glow.stop();
+      };
+    } else if (viewMode !== 'ritual') {
+      vignetteAnim.setValue(0);
+    }
+  }, [viewMode, ritualPlaced]);
+
+  // Pan responder for drag gestures (and hologram rotation in AR mode, ritual gestures)
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
-        if (viewMode !== 'ar') {
+        if (viewMode !== 'ar' && viewMode !== 'ritual') {
           translateX.setOffset(translateX._value);
           translateY.setOffset(translateY._value);
         }
@@ -262,7 +289,13 @@ export default function ARViewScreen({ route, navigation }) {
             setCurrentHologramAngle(newAngle);
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           }
-        } else if (viewMode !== 'ar') {
+        } else if (viewMode === 'ritual' && ritualPlaced && ritualStep === 1) {
+          // Swipe down to serve food
+          const swipeDistance = gestureState.dy;
+          if (swipeDistance > 50) {
+            handleServeFood();
+          }
+        } else if (viewMode !== 'ar' && viewMode !== 'ritual') {
           Animated.event(
             [
               null,
@@ -276,7 +309,7 @@ export default function ARViewScreen({ route, navigation }) {
         }
       },
       onPanResponderRelease: () => {
-        if (viewMode !== 'ar') {
+        if (viewMode !== 'ar' && viewMode !== 'ritual') {
           translateX.flattenOffset();
           translateY.flattenOffset();
         }
@@ -343,6 +376,15 @@ export default function ARViewScreen({ route, navigation }) {
       }
       setArPlaced(false);
       handleReset();
+    } else if (mode === 'ritual') {
+      // Reset ritual state
+      setRitualStep(0);
+      setRitualPlaced(false);
+      handServeAnim.setValue(0);
+      forkAnim.setValue(0);
+      plateSettleAnim.setValue(0);
+      foodGrowAnim.setValue(0);
+      handleReset();
     } else {
       handleReset();
     }
@@ -358,6 +400,70 @@ export default function ARViewScreen({ route, navigation }) {
     }
   };
 
+  const handleRitualPlacement = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setRitualPlaced(true);
+    setRitualStep(1);
+  };
+
+  const handleServeFood = () => {
+    if (ritualStep !== 1) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+
+    // Animate serving hand
+    Animated.sequence([
+      Animated.timing(handServeAnim, {
+        toValue: 1,
+        duration: 1500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(plateSettleAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Grow food portion
+    Animated.timing(foodGrowAnim, {
+      toValue: 1,
+      duration: 1500,
+      useNativeDriver: true,
+    }).start();
+
+    // Play serving sound (could add Audio later)
+    setTimeout(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setRitualStep(2);
+    }, 1800);
+  };
+
+  const handleTakeBite = () => {
+    if (ritualStep !== 2) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Animate fork
+    Animated.sequence([
+      Animated.timing(forkAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.delay(500),
+      Animated.timing(forkAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    setTimeout(() => {
+      setRitualStep(3);
+      // Could trigger TTS scent description here
+    }, 2000);
+  };
   const generateHologramAngles = async () => {
     setIsGeneratingHologram(true);
     try {
@@ -507,7 +613,7 @@ export default function ARViewScreen({ route, navigation }) {
         'Could not generate 3D views. Please check your API key and try again.',
         [{ text: 'OK' }]
       );
-      setViewMode('rotate');
+      setViewMode('ar');
     }
   };
 
@@ -645,16 +751,6 @@ export default function ARViewScreen({ route, navigation }) {
     cycleAnimation.start();
   };
 
-  const rotate = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  const backgroundColor = colorShift.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['rgba(26,26,46,0.9)', 'rgba(255,140,66,0.3)'],
-  });
-
   // AR animation interpolations
   const steamTranslateY = steamAnim.interpolate({
     inputRange: [0, 1],
@@ -704,6 +800,47 @@ export default function ARViewScreen({ route, navigation }) {
     return photoUri;
   };
 
+  // Ritual mode interpolations
+  const ritualGlowOpacity = ritualGlowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.7],
+  });
+
+  const handTranslateY = handServeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-300, 0],
+  });
+
+  const handOpacity = handServeAnim.interpolate({
+    inputRange: [0, 0.2, 0.8, 1],
+    outputRange: [0, 1, 1, 0],
+  });
+
+  const forkTranslateY = forkAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [200, -20, 200],
+  });
+
+  const forkRotate = forkAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: ['45deg', '0deg', '45deg'],
+  });
+
+  const plateShake = plateSettleAnim.interpolate({
+    inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: [0, -3, 3, -2, 0],
+  });
+
+  const vignetteOpacity = vignetteAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.6],
+  });
+
+  const foodScale = foodGrowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.7, 1],
+  });
+
   // Get current image based on angle for 3D mode
   const getCurrentImageUri = () => {
     if (viewMode === '3d' && generated3DImages) {
@@ -725,8 +862,135 @@ export default function ARViewScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* AR Camera Background */}
-      {viewMode === 'ar' ? (
+      {/* Ritual Mode - Table Placement */}
+      {viewMode === 'ritual' ? (
+        <View
+          style={styles.ritualContainer}
+          {...(ritualPlaced && ritualStep === 1 ? panResponder.panHandlers : {})}
+        >
+          {/* Darkened vignette background */}
+          <Animated.View style={[styles.ritualVignette, { opacity: vignetteOpacity }]} />
+
+          <LinearGradient
+            colors={['#1a1a2e', '#2d1810', '#1a1a2e']}
+            style={StyleSheet.absoluteFill}
+          />
+
+          {!ritualPlaced ? (
+            /* Placement Guide */
+            <View style={styles.ritualPlacementGuide}>
+              <View style={styles.tablePlacementOutline}>
+                <View style={styles.plateOutline} />
+                <Ionicons name="phone-portrait-outline" size={60} color={colors.primary} />
+              </View>
+              <Text style={styles.ritualInstructionTitle}>🍽️ Set Your Table</Text>
+              <Text style={styles.ritualInstructionText}>
+                Place your phone where you'd normally eat{'\n'}
+                (on your desk, at your table, or where your plate would be)
+              </Text>
+              <TouchableOpacity style={styles.ritualPlaceButton} onPress={handleRitualPlacement}>
+                <Text style={styles.ritualPlaceButtonText}>I'm Ready</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            /* Ritual Interaction */
+            <View style={styles.ritualInteractionContainer}>
+              {/* Food Image with Glow */}
+              <Animated.View
+                style={[
+                  styles.ritualFoodContainer,
+                  {
+                    transform: [{ scale: foodScale }, { translateY: plateShake }],
+                  },
+                ]}
+              >
+                {/* Warm glow */}
+                <Animated.View style={[styles.ritualGlow, { opacity: ritualGlowOpacity }]} />
+
+                {/* Food image */}
+                <Image source={{ uri: photoUri }} style={styles.ritualFoodImage} />
+
+                {/* Steam effect */}
+                {ritualStep >= 2 && (
+                  <View style={styles.steamContainer}>
+                    {[0, 1, 2].map(i => (
+                      <Animated.View
+                        key={i}
+                        style={[
+                          styles.steamParticle,
+                          {
+                            left: `${30 + i * 20}%`,
+                            transform: [{ translateY: steamTranslateY }],
+                            opacity: steamOpacity,
+                          },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                )}
+
+                {/* Serving hand animation */}
+                {ritualStep === 1 && (
+                  <Animated.View
+                    style={[
+                      styles.servingHand,
+                      {
+                        transform: [{ translateY: handTranslateY }],
+                        opacity: handOpacity,
+                      },
+                    ]}
+                  >
+                    <Text style={styles.servingHandEmoji}>👋</Text>
+                  </Animated.View>
+                )}
+
+                {/* Fork animation */}
+                {ritualStep === 2 && (
+                  <Animated.View
+                    style={[
+                      styles.forkContainer,
+                      {
+                        transform: [{ translateY: forkTranslateY }, { rotate: forkRotate }],
+                      },
+                    ]}
+                  >
+                    <Text style={styles.forkEmoji}>🍴</Text>
+                  </Animated.View>
+                )}
+              </Animated.View>
+
+              {/* Step instructions */}
+              <BlurView intensity={60} style={styles.ritualStepContainer}>
+                {ritualStep === 1 && (
+                  <TouchableOpacity style={styles.ritualActionButton} onPress={handleServeFood}>
+                    <Ionicons name="hand-left-outline" size={32} color={colors.primary} />
+                    <Text style={styles.ritualActionTitle}>Swipe Down to Be Served</Text>
+                    <Text style={styles.ritualActionSubtext}>
+                      Like someone's serving you at home
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {ritualStep === 2 && (
+                  <TouchableOpacity style={styles.ritualActionButton} onPress={handleTakeBite}>
+                    <Ionicons name="restaurant-outline" size={32} color={colors.primary} />
+                    <Text style={styles.ritualActionTitle}>Tap to Take a Bite</Text>
+                    <Text style={styles.ritualActionSubtext}>Savor the memory</Text>
+                  </TouchableOpacity>
+                )}
+
+                {ritualStep === 3 && (
+                  <View style={styles.ritualCompleteContainer}>
+                    <Ionicons name="heart" size={40} color="#ff6b6b" />
+                    <Text style={styles.ritualCompleteTitle}>A Taste of Home</Text>
+                    <Text style={styles.ritualCompleteText}>{scentDescription}</Text>
+                  </View>
+                )}
+              </BlurView>
+            </View>
+          )}
+        </View>
+      ) : viewMode === 'ar' ? (
         cameraPermission?.granted ? (
           <CameraView style={StyleSheet.absoluteFill} facing="back">
             {/* AR Overlay */}
@@ -949,17 +1213,13 @@ export default function ARViewScreen({ route, navigation }) {
           </View>
         )
       ) : (
-        /* Animated Background for non-AR modes */
-        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor }]}>
+        /* Animated Background for non-AR and non-Ritual modes */
+        <View style={StyleSheet.absoluteFill}>
           <LinearGradient
-            colors={
-              viewMode === 'xray'
-                ? ['#1a1a2e', '#ff8c42', '#16213e']
-                : ['#1a1a2e', '#16213e', '#0f3460']
-            }
+            colors={['#1a1a2e', '#16213e', '#0f3460']}
             style={StyleSheet.absoluteFill}
           />
-        </Animated.View>
+        </View>
       )}
 
       {/* Header */}
@@ -967,14 +1227,14 @@ export default function ARViewScreen({ route, navigation }) {
         <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()}>
           <Ionicons name="close" size={28} color="#FFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>AR View</Text>
+        <Text style={styles.headerTitle}>Memory View</Text>
         <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
           <Ionicons name="refresh" size={24} color="#FFF" />
         </TouchableOpacity>
       </BlurView>
 
-      {/* Main View Container (non-AR modes) */}
-      {viewMode !== 'ar' && (
+      {/* Main View Container (non-AR and non-Ritual modes) */}
+      {viewMode !== 'ar' && viewMode !== 'ritual' && (
         <View style={styles.viewContainer} {...panResponder.panHandlers}>
           {isGenerating3D ? (
             <View style={styles.loadingContainer}>
@@ -994,55 +1254,11 @@ export default function ARViewScreen({ route, navigation }) {
                       scale:
                         viewMode === 'zoom' ? Animated.multiply(scaleAnim, pulseAnim) : scaleAnim,
                     },
-                    { rotateY: viewMode === 'rotate' ? rotate : '0deg' },
-                    { perspective: 1000 },
                   ],
                 },
               ]}
             >
-              {/* Multiple image layers for depth */}
-              {viewMode === 'rotate' && (
-                <>
-                  <Image
-                    source={{ uri: getCurrentImageUri() }}
-                    style={[
-                      styles.imageShadow,
-                      { opacity: 0.3, transform: [{ scale: 0.95 }, { translateX: -10 }] },
-                    ]}
-                  />
-                  <Image
-                    source={{ uri: getCurrentImageUri() }}
-                    style={[
-                      styles.imageShadow,
-                      { opacity: 0.2, transform: [{ scale: 0.9 }, { translateX: -20 }] },
-                    ]}
-                  />
-                </>
-              )}
-
-              <Image
-                source={{ uri: getCurrentImageUri() }}
-                style={[styles.image, viewMode === 'xray' && { opacity: 0.8 }]}
-              />
-
-              {/* X-Ray overlay effect */}
-              {viewMode === 'xray' && (
-                <View style={styles.xrayOverlay}>
-                  <Image
-                    source={{ uri: getCurrentImageUri() }}
-                    style={[styles.image, { opacity: 0.5, tintColor: '#ff8c42' }]}
-                  />
-                </View>
-              )}
-
-              {/* Scan lines for tech effect */}
-              {viewMode === 'xray' && (
-                <View style={styles.scanLinesContainer}>
-                  {[...Array(10)].map((_, i) => (
-                    <View key={i} style={styles.scanLine} />
-                  ))}
-                </View>
-              )}
+              <Image source={{ uri: getCurrentImageUri() }} style={styles.image} />
 
               {/* 3D Mode indicator */}
               {viewMode === '3d' && generated3DImages && (
@@ -1057,28 +1273,32 @@ export default function ARViewScreen({ route, navigation }) {
               )}
             </Animated.View>
           )}
-
-          {/* Floating AR markers */}
-          {viewMode === 'rotate' && (
-            <View style={styles.arMarkersContainer}>
-              <View style={[styles.arMarker, styles.markerTopLeft]} />
-              <View style={[styles.arMarker, styles.markerTopRight]} />
-              <View style={[styles.arMarker, styles.markerBottomLeft]} />
-              <View style={[styles.arMarker, styles.markerBottomRight]} />
-            </View>
-          )}
         </View>
       )}
 
       {/* View Mode Selector */}
       <BlurView intensity={80} style={styles.viewModeContainer}>
         <TouchableOpacity
+          style={[styles.viewModeButton, viewMode === 'ritual' && styles.viewModeActive]}
+          onPress={() => switchViewMode('ritual')}
+        >
+          <Ionicons
+            name="restaurant-outline"
+            size={18}
+            color={viewMode === 'ritual' ? colors.primary : '#FFF'}
+          />
+          <Text style={[styles.viewModeText, viewMode === 'ritual' && styles.viewModeTextActive]}>
+            Ritual
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={[styles.viewModeButton, viewMode === 'ar' && styles.viewModeActive]}
           onPress={() => switchViewMode('ar')}
         >
           <Ionicons
             name="cube-outline"
-            size={20}
+            size={18}
             color={viewMode === 'ar' ? colors.primary : '#FFF'}
           />
           <Text style={[styles.viewModeText, viewMode === 'ar' && styles.viewModeTextActive]}>
@@ -1087,20 +1307,10 @@ export default function ARViewScreen({ route, navigation }) {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.viewModeButton, viewMode === 'rotate' && styles.viewModeActive]}
-          onPress={() => switchViewMode('rotate')}
-        >
-          <Ionicons name="sync" size={20} color={viewMode === 'rotate' ? colors.primary : '#FFF'} />
-          <Text style={[styles.viewModeText, viewMode === 'rotate' && styles.viewModeTextActive]}>
-            360°
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
           style={[styles.viewModeButton, viewMode === '3d' && styles.viewModeActive]}
           onPress={() => switchViewMode('3d')}
         >
-          <Ionicons name="cube" size={20} color={viewMode === '3d' ? colors.primary : '#FFF'} />
+          <Ionicons name="cube" size={18} color={viewMode === '3d' ? colors.primary : '#FFF'} />
           <Text style={[styles.viewModeText, viewMode === '3d' && styles.viewModeTextActive]}>
             AI 3D
           </Text>
@@ -1110,25 +1320,15 @@ export default function ARViewScreen({ route, navigation }) {
           style={[styles.viewModeButton, viewMode === 'zoom' && styles.viewModeActive]}
           onPress={() => switchViewMode('zoom')}
         >
-          <Ionicons name="scan" size={20} color={viewMode === 'zoom' ? colors.primary : '#FFF'} />
+          <Ionicons name="scan" size={18} color={viewMode === 'zoom' ? colors.primary : '#FFF'} />
           <Text style={[styles.viewModeText, viewMode === 'zoom' && styles.viewModeTextActive]}>
             Focus
           </Text>
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.viewModeButton, viewMode === 'xray' && styles.viewModeActive]}
-          onPress={() => switchViewMode('xray')}
-        >
-          <Ionicons name="eye" size={20} color={viewMode === 'xray' ? colors.primary : '#FFF'} />
-          <Text style={[styles.viewModeText, viewMode === 'xray' && styles.viewModeTextActive]}>
-            X-Ray
-          </Text>
-        </TouchableOpacity>
       </BlurView>
 
-      {/* Scent Description - Only show in non-AR modes */}
-      {viewMode !== 'ar' && (
+      {/* Scent Description - Only show in non-AR and non-Ritual modes */}
+      {viewMode !== 'ar' && viewMode !== 'ritual' && (
         <BlurView intensity={80} style={styles.descriptionContainer}>
           <View style={styles.descriptionHeader}>
             <Ionicons name="flower-outline" size={20} color={colors.primary} />
@@ -1140,8 +1340,8 @@ export default function ARViewScreen({ route, navigation }) {
         </BlurView>
       )}
 
-      {/* Controls - Only show in non-AR modes */}
-      {viewMode !== 'ar' && (
+      {/* Controls - Only show in non-AR and non-Ritual modes */}
+      {viewMode !== 'ar' && viewMode !== 'ritual' && (
         <View style={styles.controls}>
           <TouchableOpacity style={styles.controlButton} onPress={handleZoomOut}>
             <Ionicons name="remove" size={24} color="#FFF" />
@@ -1161,16 +1361,22 @@ export default function ARViewScreen({ route, navigation }) {
       {/* Instructions */}
       <View style={styles.instructions}>
         <Text style={styles.instructionText}>
+          {viewMode === 'ritual' &&
+            (ritualPlaced
+              ? ritualStep === 1
+                ? '👋 Swipe down to be served'
+                : ritualStep === 2
+                ? '🍴 Tap to take a bite'
+                : '❤️ Enjoy your memory'
+              : '🍽️ Prepare your table ritual')}
           {viewMode === 'ar' &&
             (arPlaced
               ? isGeneratingHologram
                 ? '🔮 Generating 8-angle hologram...'
                 : '🔮 3D Hologram active • Swipe to rotate'
               : '📍 Point at surface • Tap to project hologram')}
-          {viewMode === 'rotate' && '🔄 Auto-rotating • Drag to reposition'}
           {viewMode === '3d' && '🎬 AI-generated 360° views • Watch it rotate'}
           {viewMode === 'zoom' && '🔍 Examining details • Pinch to zoom'}
-          {viewMode === 'xray' && '👁️ Enhanced view • See texture layers'}
         </Text>
       </View>
     </View>
@@ -1224,68 +1430,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     resizeMode: 'cover',
     zIndex: 10,
-  },
-  imageShadow: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    borderRadius: 20,
-    resizeMode: 'cover',
-  },
-  xrayOverlay: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  scanLinesContainer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    justifyContent: 'space-between',
-  },
-  scanLine: {
-    width: '100%',
-    height: 2,
-    backgroundColor: '#ff8c42',
-    opacity: 0.3,
-  },
-  arMarkersContainer: {
-    position: 'absolute',
-    width: width * 0.9,
-    height: width * 0.9,
-  },
-  arMarker: {
-    position: 'absolute',
-    width: 30,
-    height: 30,
-    borderColor: colors.primary,
-    borderWidth: 3,
-  },
-  markerTopLeft: {
-    top: 0,
-    left: 0,
-    borderRightWidth: 0,
-    borderBottomWidth: 0,
-  },
-  markerTopRight: {
-    top: 0,
-    right: 0,
-    borderLeftWidth: 0,
-    borderBottomWidth: 0,
-  },
-  markerBottomLeft: {
-    bottom: 0,
-    left: 0,
-    borderRightWidth: 0,
-    borderTopWidth: 0,
-  },
-  markerBottomRight: {
-    bottom: 0,
-    right: 0,
-    borderLeftWidth: 0,
-    borderTopWidth: 0,
   },
   viewModeContainer: {
     flexDirection: 'row',
@@ -1739,5 +1883,156 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: spacing.xs,
     textAlign: 'center',
+  },
+  // Ritual Mode Styles
+  ritualContainer: {
+    flex: 1,
+  },
+  ritualVignette: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
+  },
+  ritualPlacementGuide: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  tablePlacementOutline: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 3,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  plateOutline: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    borderWidth: 2,
+    borderColor: 'rgba(255,140,66,0.3)',
+  },
+  ritualInstructionTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  ritualInstructionText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: spacing.xl,
+  },
+  ritualPlaceButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.md,
+    borderRadius: 30,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+  },
+  ritualPlaceButtonText: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  ritualInteractionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  ritualFoodContainer: {
+    width: width * 0.8,
+    height: width * 0.8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xxl,
+  },
+  ritualGlow: {
+    position: 'absolute',
+    width: width * 0.85,
+    height: width * 0.85,
+    borderRadius: width * 0.425,
+    backgroundColor: '#ff8c42',
+    shadowColor: '#ff8c42',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 40,
+  },
+  ritualFoodImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+    resizeMode: 'cover',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+  },
+  servingHand: {
+    position: 'absolute',
+    top: -150,
+    alignItems: 'center',
+  },
+  servingHandEmoji: {
+    fontSize: 80,
+  },
+  forkContainer: {
+    position: 'absolute',
+    right: -50,
+  },
+  forkEmoji: {
+    fontSize: 60,
+  },
+  ritualStepContainer: {
+    borderRadius: 20,
+    padding: spacing.lg,
+    overflow: 'hidden',
+    minWidth: width * 0.8,
+    alignItems: 'center',
+  },
+  ritualActionButton: {
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  ritualActionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFF',
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  ritualActionSubtext: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+  },
+  ritualCompleteContainer: {
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  ritualCompleteTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFF',
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  ritualCompleteText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
