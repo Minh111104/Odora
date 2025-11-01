@@ -351,100 +351,88 @@ export default function ARViewScreen({ route, navigation }) {
             </View>
           ) : (
             /* Ritual Interaction */
-            <View style={styles.ritualInteractionContainer}>
-              {/* Food Image with Glow */}
-              <Animated.View
-                style={[
-                  styles.ritualFoodContainer,
-                  {
-                    transform: [{ scale: foodScale }, { translateY: plateShake }],
-                  },
-                ]}
-              >
-                {/* Warm glow */}
-                <Animated.View style={[styles.ritualGlow, { opacity: ritualGlowOpacity }]} />
+            <ScrollView
+              style={styles.ritualScrollView}
+              contentContainerStyle={styles.ritualScrollContent}
+              showsVerticalScrollIndicator={true}
+              persistentScrollbar={true}
+            >
+              <View style={styles.ritualInteractionContainer}>
+                {/* Food Image with Glow */}
+                <Animated.View
+                  style={[
+                    styles.ritualFoodContainer,
+                    {
+                      transform: [{ scale: foodScale }, { translateY: plateShake }],
+                    },
+                  ]}
+                >
+                  {/* Warm glow */}
+                  <Animated.View style={[styles.ritualGlow, { opacity: ritualGlowOpacity }]} />
 
-                {/* Food image */}
-                <Image source={{ uri: photoUri }} style={styles.ritualFoodImage} />
+                  {/* Food image */}
+                  <Image source={{ uri: photoUri }} style={styles.ritualFoodImage} />
 
-                {/* Steam effect */}
-                {ritualStep >= 2 && (
-                  <View style={styles.steamContainer}>
-                    {[0, 1, 2].map(i => (
-                      <Animated.View
-                        key={i}
-                        style={[
-                          styles.steamParticle,
-                          {
-                            left: `${30 + i * 20}%`,
-                            transform: [{ translateY: steamTranslateY }],
-                            opacity: steamOpacity,
-                          },
-                        ]}
-                      />
-                    ))}
-                  </View>
-                )}
+                  {/* Serving hand animation */}
+                  {ritualStep === 1 && (
+                    <Animated.View
+                      style={[
+                        styles.servingHand,
+                        {
+                          transform: [{ translateY: handTranslateY }],
+                          opacity: handOpacity,
+                        },
+                      ]}
+                    >
+                      <Text style={styles.servingHandEmoji}>👋</Text>
+                    </Animated.View>
+                  )}
 
-                {/* Serving hand animation */}
-                {ritualStep === 1 && (
-                  <Animated.View
-                    style={[
-                      styles.servingHand,
-                      {
-                        transform: [{ translateY: handTranslateY }],
-                        opacity: handOpacity,
-                      },
-                    ]}
-                  >
-                    <Text style={styles.servingHandEmoji}>👋</Text>
-                  </Animated.View>
-                )}
+                  {/* Fork animation */}
+                  {ritualStep === 2 && (
+                    <Animated.View
+                      style={[
+                        styles.forkContainer,
+                        {
+                          transform: [{ translateY: forkTranslateY }, { rotate: forkRotate }],
+                        },
+                      ]}
+                    >
+                      <Text style={styles.forkEmoji}>🍴</Text>
+                    </Animated.View>
+                  )}
+                </Animated.View>
 
-                {/* Fork animation */}
-                {ritualStep === 2 && (
-                  <Animated.View
-                    style={[
-                      styles.forkContainer,
-                      {
-                        transform: [{ translateY: forkTranslateY }, { rotate: forkRotate }],
-                      },
-                    ]}
-                  >
-                    <Text style={styles.forkEmoji}>🍴</Text>
-                  </Animated.View>
-                )}
-              </Animated.View>
+                {/* Step instructions */}
+                <BlurView intensity={60} style={styles.ritualStepContainer}>
+                  {ritualStep === 1 && (
+                    <TouchableOpacity style={styles.ritualActionButton} onPress={handleServeFood}>
+                      <Ionicons name="hand-left-outline" size={32} color={colors.primary} />
+                      <Text style={styles.ritualActionTitle}>Swipe Down to Be Served</Text>
+                      <Text style={styles.ritualActionSubtext}>
+                        Like someone's serving you at home
+                      </Text>
+                    </TouchableOpacity>
+                  )}
 
-              {/* Step instructions */}
-              <BlurView intensity={60} style={styles.ritualStepContainer}>
-                {ritualStep === 1 && (
-                  <TouchableOpacity style={styles.ritualActionButton} onPress={handleServeFood}>
-                    <Ionicons name="hand-left-outline" size={32} color={colors.primary} />
-                    <Text style={styles.ritualActionTitle}>Swipe Down to Be Served</Text>
-                    <Text style={styles.ritualActionSubtext}>
-                      Like someone's serving you at home
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                  {ritualStep === 2 && (
+                    <TouchableOpacity style={styles.ritualActionButton} onPress={handleTakeBite}>
+                      <Ionicons name="restaurant-outline" size={32} color={colors.primary} />
+                      <Text style={styles.ritualActionTitle}>Tap to Take a Bite</Text>
+                      <Text style={styles.ritualActionSubtext}>Savor the memory</Text>
+                    </TouchableOpacity>
+                  )}
 
-                {ritualStep === 2 && (
-                  <TouchableOpacity style={styles.ritualActionButton} onPress={handleTakeBite}>
-                    <Ionicons name="restaurant-outline" size={32} color={colors.primary} />
-                    <Text style={styles.ritualActionTitle}>Tap to Take a Bite</Text>
-                    <Text style={styles.ritualActionSubtext}>Savor the memory</Text>
-                  </TouchableOpacity>
-                )}
-
-                {ritualStep === 3 && (
-                  <View style={styles.ritualCompleteContainer}>
-                    <Ionicons name="heart" size={40} color="#ff6b6b" />
-                    <Text style={styles.ritualCompleteTitle}>A Taste of Home</Text>
-                    <Text style={styles.ritualCompleteText}>{scentDescription}</Text>
-                  </View>
-                )}
-              </BlurView>
-            </View>
+                  {ritualStep === 3 && (
+                    <View style={styles.ritualCompleteContainer}>
+                      <Ionicons name="heart" size={40} color="#ff6b6b" />
+                      <Text style={styles.ritualCompleteTitle}>A Taste of Home</Text>
+                      <Text style={styles.ritualCompleteText}>{scentDescription}</Text>
+                    </View>
+                  )}
+                </BlurView>
+              </View>
+            </ScrollView>
           )}
         </View>
       ) : (
@@ -492,14 +480,15 @@ export default function ARViewScreen({ route, navigation }) {
       )}
 
       {/* View Mode Selector */}
-      <BlurView intensity={80} style={styles.viewModeContainer}>
+      <BlurView intensity={100} tint="dark" style={styles.viewModeContainer}>
+        <View style={styles.viewModeBackground} />
         <TouchableOpacity
           style={[styles.viewModeButton, viewMode === 'ritual' && styles.viewModeActive]}
           onPress={() => switchViewMode('ritual')}
         >
           <Ionicons
             name="restaurant-outline"
-            size={18}
+            size={12}
             color={viewMode === 'ritual' ? colors.primary : '#FFF'}
           />
           <Text style={[styles.viewModeText, viewMode === 'ritual' && styles.viewModeTextActive]}>
@@ -511,7 +500,7 @@ export default function ARViewScreen({ route, navigation }) {
           style={[styles.viewModeButton, viewMode === 'zoom' && styles.viewModeActive]}
           onPress={() => switchViewMode('zoom')}
         >
-          <Ionicons name="scan" size={18} color={viewMode === 'zoom' ? colors.primary : '#FFF'} />
+          <Ionicons name="scan" size={16} color={viewMode === 'zoom' ? colors.primary : '#FFF'} />
           <Text style={[styles.viewModeText, viewMode === 'zoom' && styles.viewModeTextActive]}>
             Focus
           </Text>
@@ -582,6 +571,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xxl,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   closeButton: {
     width: 44,
@@ -590,9 +580,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    color: '#FFF',
+    color: '#FFFFFF',
     fontSize: 20,
     fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   resetButton: {
     width: 44,
@@ -620,27 +613,39 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   viewModeContainer: {
+    position: 'absolute',
+    bottom: spacing.xl + 80,
+    left: spacing.lg,
+    right: spacing.lg,
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginHorizontal: spacing.lg,
-    borderRadius: 16,
-    padding: spacing.xs,
+    borderRadius: 12,
+    padding: 4,
     overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,140,66,0.3)',
+    zIndex: 100,
+  },
+  viewModeBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(26,26,46,0.85)',
   },
   viewModeButton: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: spacing.sm,
-    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
   },
   viewModeActive: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,140,66,0.3)',
   },
   viewModeText: {
-    color: 'rgba(255,255,255,0.7)',
+    color: '#FFFFFF',
     fontSize: 10,
-    marginTop: 4,
-    fontWeight: '600',
+    marginTop: 2,
+    fontWeight: '700',
   },
   viewModeTextActive: {
     color: colors.primary,
@@ -665,12 +670,12 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
   },
   descriptionScrollView: {
-    maxHeight: 80,
+    maxHeight: 150,
   },
   descriptionText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-    lineHeight: 18,
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 13,
+    lineHeight: 20,
   },
   controls: {
     flexDirection: 'row',
@@ -712,9 +717,13 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   instructionText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 12,
+    color: '#FFFFFF',
+    fontSize: 14,
     textAlign: 'center',
+    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   loadingContainer: {
     alignItems: 'center',
@@ -1123,6 +1132,13 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 18,
     fontWeight: '700',
+  },
+  ritualScrollView: {
+    flex: 1,
+  },
+  ritualScrollContent: {
+    flexGrow: 1,
+    paddingBottom: spacing.xxl,
   },
   ritualInteractionContainer: {
     flex: 1,
