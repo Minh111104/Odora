@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -19,7 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, spacing } from '../constants/theme';
 import { generateScentDescription } from '../services/aiService';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 export default function ARViewScreen({ route, navigation }) {
   const { photoUri, scentDescription } = route.params;
@@ -28,6 +29,13 @@ export default function ARViewScreen({ route, navigation }) {
   const [scale, setScale] = useState(1);
   const [ritualStep, setRitualStep] = useState(0); // 0: placement, 1: served, 2: eating, 3: complete
   const [ritualPlaced, setRitualPlaced] = useState(false);
+
+  // Gamification state
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [totalRituals, setTotalRituals] = useState(0);
+  const [badges, setBadges] = useState([]);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [earnedBadge, setEarnedBadge] = useState(null);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -39,6 +47,10 @@ export default function ARViewScreen({ route, navigation }) {
   const plateSettleAnim = useRef(new Animated.Value(0)).current;
   const vignetteAnim = useRef(new Animated.Value(0)).current;
   const foodGrowAnim = useRef(new Animated.Value(0)).current;
+
+  // Gamification animations
+  const confettiAnim = useRef(new Animated.Value(0)).current;
+  const badgeAnim = useRef(new Animated.Value(0)).current;
 
   // Pulse animation for focus mode
   React.useEffect(() => {
@@ -245,6 +257,113 @@ export default function ARViewScreen({ route, navigation }) {
     }, 1800);
   };
 
+  // Gamification functions
+  const loadGamificationData = async () => {
+    try {
+      const streak = await AsyncStorage.getItem('ritual_streak');
+      const total = await AsyncStorage.getItem('total_rituals');
+      const badgesData = await AsyncStorage.getItem('earned_badges');
+      const lastDate = await AsyncStorage.getItem('last_ritual_date');
+
+      if (streak) setCurrentStreak(parseInt(streak));
+      if (total) setTotalRituals(parseInt(total));
+      if (badgesData) setBadges(JSON.parse(badgesData));
+
+      // Check if streak should continue
+      if (lastDate) {
+        const today = new Date().toDateString();
+        const yesterday = new Date(Date.now() - 86400000).toDateString();
+        if (lastDate !== today && lastDate !== yesterday) {
+          // Streak broken
+          setCurrentStreak(0);
+          await AsyncStorage.setItem('ritual_streak', '0');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading gamification data:', error);
+    }
+  };
+
+  const saveGamificationData = async (streak, total, newBadges) => {
+    try {
+      await AsyncStorage.setItem('ritual_streak', streak.toString());
+      await AsyncStorage.setItem('total_rituals', total.toString());
+      await AsyncStorage.setItem('earned_badges', JSON.stringify(newBadges));
+      await AsyncStorage.setItem('last_ritual_date', new Date().toDateString());
+    } catch (error) {
+      console.error('Error saving gamification data:', error);
+    }
+  };
+
+  const checkAndAwardBadges = (streak, total) => {
+    const availableBadges = [
+      { id: 'first_ritual', name: 'First Bite', icon: '🍽️', condition: total >= 1 },
+      { id: 'three_days', name: '3-Day Warmth', icon: '🌟', condition: streak >= 3 },
+      { id: 'week_streak', name: '7-Day Table Reunion', icon: '🔥', condition: streak >= 7 },
+      { id: 'ten_rituals', name: 'Memory Keeper', icon: '💝', condition: total >= 10 },
+      {
+        id: 'month_streak',
+        name: "One Month with Mom's Cooking",
+        icon: '👩‍🍳',
+        condition: streak >= 30,
+      },
+      { id: 'fifty_rituals', name: 'Home Chef', icon: '👨‍🍳', condition: total >= 50 },
+    ];
+
+    const newBadges = [...badges];
+    let badgeEarned = false;
+
+    availableBadges.forEach(badge => {
+      if (badge.condition && !badges.find(b => b.id === badge.id)) {
+        newBadges.push(badge);
+        badgeEarned = true;
+        setEarnedBadge(badge);
+        animateBadgeEarned();
+      }
+    });
+
+    if (badgeEarned) {
+      setBadges(newBadges);
+    }
+
+    return newBadges;
+  };
+
+  const animateConfetti = () => {
+    setShowConfetti(true);
+    confettiAnim.setValue(0);
+    Animated.timing(confettiAnim, {
+      toValue: 1,
+      duration: 2000,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowConfetti(false);
+    });
+  };
+
+  const animateBadgeEarned = () => {
+    badgeAnim.setValue(0);
+    Animated.spring(badgeAnim, {
+      toValue: 1,
+      tension: 50,
+      friction: 5,
+      useNativeDriver: true,
+    }).start(() => {
+      setTimeout(() => {
+        Animated.timing(badgeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => setEarnedBadge(null));
+      }, 3000);
+    });
+  };
+
+  // Load gamification data on mount
+  React.useEffect(() => {
+    loadGamificationData();
+  }, []);
+
   const handleTakeBite = () => {
     if (ritualStep !== 2) return;
 
@@ -267,7 +386,35 @@ export default function ARViewScreen({ route, navigation }) {
 
     setTimeout(() => {
       setRitualStep(3);
-      // Could trigger TTS scent description here
+
+      // Update gamification
+      const today = new Date().toDateString();
+      const lastDate = AsyncStorage.getItem('last_ritual_date');
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+      lastDate.then(date => {
+        let newStreak = currentStreak;
+        if (date === today) {
+          // Same day, don't increment streak
+          newStreak = currentStreak;
+        } else if (date === yesterday) {
+          // Consecutive day, increment streak
+          newStreak = currentStreak + 1;
+        } else {
+          // New streak
+          newStreak = 1;
+        }
+
+        const newTotal = totalRituals + 1;
+        setCurrentStreak(newStreak);
+        setTotalRituals(newTotal);
+
+        const newBadges = checkAndAwardBadges(newStreak, newTotal);
+        saveGamificationData(newStreak, newTotal, newBadges);
+
+        // Show confetti
+        animateConfetti();
+      });
     }, 2000);
   };
 
@@ -427,12 +574,104 @@ export default function ARViewScreen({ route, navigation }) {
                     <View style={styles.ritualCompleteContainer}>
                       <Ionicons name="heart" size={40} color="#ff6b6b" />
                       <Text style={styles.ritualCompleteTitle}>A Taste of Home</Text>
+
+                      {/* Gamification Stats */}
+                      <View style={styles.statsContainer}>
+                        <View style={styles.statBox}>
+                          <Text style={styles.statNumber}>{currentStreak}</Text>
+                          <Text style={styles.statLabel}>🔥 Day Streak</Text>
+                        </View>
+                        <View style={styles.statBox}>
+                          <Text style={styles.statNumber}>{totalRituals}</Text>
+                          <Text style={styles.statLabel}>🍽️ Total Rituals</Text>
+                        </View>
+                        <View style={styles.statBox}>
+                          <Text style={styles.statNumber}>{badges.length}</Text>
+                          <Text style={styles.statLabel}>⭐ Badges</Text>
+                        </View>
+                      </View>
+
+                      {/* Recent Badges */}
+                      {badges.length > 0 && (
+                        <View style={styles.badgesContainer}>
+                          <Text style={styles.badgesTitle}>Your Badges</Text>
+                          <View style={styles.badgesList}>
+                            {badges.slice(-3).map(badge => (
+                              <View key={badge.id} style={styles.badgeItem}>
+                                <Text style={styles.badgeIcon}>{badge.icon}</Text>
+                                <Text style={styles.badgeName}>{badge.name}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      )}
+
                       <Text style={styles.ritualCompleteText}>{scentDescription}</Text>
                     </View>
                   )}
                 </BlurView>
               </View>
             </ScrollView>
+          )}
+
+          {/* Streak Badge - Always visible in ritual mode */}
+          {viewMode === 'ritual' && ritualPlaced && currentStreak > 0 && (
+            <View style={styles.streakBadge}>
+              <Text style={styles.streakText}>🔥 {currentStreak}</Text>
+            </View>
+          )}
+
+          {/* Confetti Animation */}
+          {showConfetti && (
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              {[...Array(20)].map((_, i) => {
+                const confettiY = confettiAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-100, height + 100],
+                });
+                const confettiRotate = confettiAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0deg', '360deg'],
+                });
+                return (
+                  <Animated.View
+                    key={i}
+                    style={[
+                      styles.confetti,
+                      {
+                        left: `${Math.random() * 100}%`,
+                        backgroundColor: ['#ff6b6b', '#4ecdc4', '#ffe66d', '#a8e6cf'][i % 4],
+                        transform: [{ translateY: confettiY }, { rotate: confettiRotate }],
+                      },
+                    ]}
+                  />
+                );
+              })}
+            </View>
+          )}
+
+          {/* Badge Earned Popup */}
+          {earnedBadge && (
+            <Animated.View
+              style={[
+                styles.badgeEarnedPopup,
+                {
+                  opacity: badgeAnim,
+                  transform: [
+                    {
+                      scale: badgeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.5, 1],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <Text style={styles.badgeEarnedIcon}>{earnedBadge.icon}</Text>
+              <Text style={styles.badgeEarnedTitle}>Badge Earned!</Text>
+              <Text style={styles.badgeEarnedName}>{earnedBadge.name}</Text>
+            </Animated.View>
           )}
         </View>
       ) : (
@@ -1228,5 +1467,121 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
     lineHeight: 20,
+    marginTop: spacing.md,
+  },
+  // Gamification Styles
+  streakBadge: {
+    position: 'absolute',
+    top: spacing.xl + 60,
+    right: spacing.lg,
+    backgroundColor: 'rgba(255,140,66,0.9)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  streakText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginVertical: spacing.md,
+    gap: spacing.sm,
+  },
+  statBox: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,140,66,0.1)',
+    padding: spacing.md,
+    borderRadius: 12,
+    flex: 1,
+  },
+  statNumber: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 4,
+  },
+  badgesContainer: {
+    width: '100%',
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  badgesTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  badgesList: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  badgeItem: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    padding: spacing.sm,
+    borderRadius: 12,
+    minWidth: 80,
+  },
+  badgeIcon: {
+    fontSize: 32,
+    marginBottom: 4,
+  },
+  badgeName: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+  },
+  confetti: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  badgeEarnedPopup: {
+    position: 'absolute',
+    top: '40%',
+    left: '50%',
+    marginLeft: -120,
+    width: 240,
+    backgroundColor: 'rgba(26,26,46,0.95)',
+    borderRadius: 20,
+    padding: spacing.xl,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.primary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  badgeEarnedIcon: {
+    fontSize: 60,
+    marginBottom: spacing.sm,
+  },
+  badgeEarnedTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.primary,
+    marginBottom: spacing.xs,
+  },
+  badgeEarnedName: {
+    fontSize: 16,
+    color: '#FFF',
+    textAlign: 'center',
   },
 });
