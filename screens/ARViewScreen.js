@@ -621,31 +621,78 @@ export default function ARViewScreen({ route, navigation }) {
             </View>
           )}
 
-          {/* Confetti Animation */}
+          {/* Firework Animation */}
           {showConfetti && (
             <View style={StyleSheet.absoluteFill} pointerEvents="none">
-              {[...Array(20)].map((_, i) => {
-                const confettiY = confettiAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-100, height + 100],
+              {[...Array(3)].map((_, burstIndex) => {
+                // Create 3 firework bursts at different positions
+                const burstX = [width * 0.25, width * 0.5, width * 0.75][burstIndex];
+                const burstY = [height * 0.3, height * 0.2, height * 0.35][burstIndex];
+                const startTime = burstIndex * 0.25;
+                const endTime = Math.min(startTime + 0.6, 1);
+
+                return [...Array(30)].map((__, particleIndex) => {
+                  const angle = (particleIndex / 30) * Math.PI * 2;
+                  const distance = 80 + Math.random() * 60;
+
+                  const particleX = confettiAnim.interpolate({
+                    inputRange: [0, startTime, endTime, 1],
+                    outputRange: [0, 0, Math.cos(angle) * distance, Math.cos(angle) * distance],
+                    extrapolate: 'clamp',
+                  });
+
+                  const particleY = confettiAnim.interpolate({
+                    inputRange: [0, startTime, endTime, 1],
+                    outputRange: [
+                      0,
+                      0,
+                      Math.sin(angle) * distance,
+                      Math.sin(angle) * distance + 40,
+                    ],
+                    extrapolate: 'clamp',
+                  });
+
+                  const particleOpacity = confettiAnim.interpolate({
+                    inputRange: [0, startTime, startTime + 0.1, endTime, 1],
+                    outputRange: [0, 0, 1, 0.8, 0],
+                    extrapolate: 'clamp',
+                  });
+
+                  const particleScale = confettiAnim.interpolate({
+                    inputRange: [0, startTime, endTime, 1],
+                    outputRange: [0, 0, 1.2, 0.4],
+                    extrapolate: 'clamp',
+                  });
+
+                  return (
+                    <Animated.View
+                      key={`${burstIndex}-${particleIndex}`}
+                      style={[
+                        styles.fireworkParticle,
+                        {
+                          left: burstX,
+                          top: burstY,
+                          backgroundColor: [
+                            '#ff6b6b',
+                            '#4ecdc4',
+                            '#ffe66d',
+                            '#a8e6cf',
+                            '#ff8c42',
+                            '#95e1d3',
+                            '#f38181',
+                            '#aa96da',
+                          ][particleIndex % 8],
+                          opacity: particleOpacity,
+                          transform: [
+                            { translateX: particleX },
+                            { translateY: particleY },
+                            { scale: particleScale },
+                          ],
+                        },
+                      ]}
+                    />
+                  );
                 });
-                const confettiRotate = confettiAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['0deg', '360deg'],
-                });
-                return (
-                  <Animated.View
-                    key={i}
-                    style={[
-                      styles.confetti,
-                      {
-                        left: `${Math.random() * 100}%`,
-                        backgroundColor: ['#ff6b6b', '#4ecdc4', '#ffe66d', '#a8e6cf'][i % 4],
-                        transform: [{ translateY: confettiY }, { rotate: confettiRotate }],
-                      },
-                    ]}
-                  />
-                );
               })}
             </View>
           )}
@@ -1546,11 +1593,15 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
   },
-  confetti: {
+  fireworkParticle: {
     position: 'absolute',
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    shadowColor: '#fff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
   },
   badgeEarnedPopup: {
     position: 'absolute',
