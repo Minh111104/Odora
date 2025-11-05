@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, typography, shadows } from '../constants/theme';
 import { saveMemory } from '../services/storageService';
+import { saveImagePermanently } from '../services/fileService';
 
 const COMMON_TAGS = [
   'Breakfast',
@@ -49,8 +50,11 @@ export default function DescriptionEditScreen({ route, navigation }) {
     setIsSaving(true);
 
     try {
+      // Save image to permanent storage
+      const permanentPhotoUri = await saveImagePermanently(photoUri);
+
       await saveMemory({
-        photoUri,
+        photoUri: permanentPhotoUri,
         audioUri,
         scentDescription: description,
         tags: selectedTags,
