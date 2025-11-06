@@ -1,8 +1,8 @@
-# 🌸 Odora – Multisensory Memory Capture
+# 🌸 Odora — Scent Memory Journal
 
 **Because sometimes, remembering how something smelled is just as powerful as smelling it again.**
 
-Odora is a mobile app designed to help homesick students recreate scent memories through multisensory triggers. Using AI-generated descriptions, ambient sounds, and family voices, we bring students closer to home—one meal at a time.
+Odora is a mobile app designed to help homesick students recreate scent memories through multisensory triggers. Using AI-generated descriptions and ambient sounds, we bring students closer to home—one meal at a time.
 
 ## 🎯 The Problem
 
@@ -10,40 +10,53 @@ International students often miss the familiar scents of home-cooked meals. Whil
 
 ## ✨ Features
 
-### MVP Features (Phase 1)
-
 - 📸 **Photo + Audio Recording**
-  - Capture images of food
+
+  - Capture images of food with camera or gallery
   - Record ambient cooking sounds (10-30 seconds)
+  - Images saved to permanent storage
+
 - 🤖 **AI Scent Description Generator**
 
   - GPT-4 Vision API analyzes food photos
   - Generates vivid, sensory-rich descriptions
   - User can edit and personalize descriptions
 
-- 🎭 **Memory Playback Mode**
-  - Displays photos with warm, nostalgic filters
-  - Plays cooking sounds on loop
-  - Text-to-speech reads scent descriptions in a calming voice
-- 👨‍👩‍👧 **Family Connection**
+- 🎭 **Ritual Mode** — Immersive 4-step experience
 
-  - Family members can record their own descriptions
-  - "Mom's voice describing Sunday dinner" beats AI every time
+  - **Placement:** Set your table (phone positioning)
+  - **Served:** Swipe down to be served (hand animation)
+  - **Take a Bite:** Tap to eat (fork animation)
+  - **Completion:** View stats, badges, and memory notes
+
+- 🔍 **Focus Mode** — Detailed inspection
+
+  - Zoom and pan to examine food details
+  - Pinch to zoom functionality
+  - Scrollable scent analysis
+
+- 🎮 **Gamification System**
+
+  - Daily streak tracking (consecutive days)
+  - Total ritual counter (lifetime completions)
+  - 6 achievement badges (First Bite, 3-Day Warmth, 7-Day Table Reunion, Memory Keeper, One Month with Mom's Cooking, Home Chef)
+  - Firework celebrations on ritual completion
+  - Badge earned popups with animations
 
 - 📊 **Scent Memory Journal**
   - Rate how well you "remembered" the smell (1-5 stars)
-  - Track which sensory combinations work best
   - Build personal library of food memories
+  - Tag system for organization
 
 ## 🛠️ Tech Stack
 
-- **Frontend:** React Native (Expo)
+- **Frontend:** React Native (Expo SDK ~54)
 - **AI:** OpenAI GPT-4 Vision API
 - **Audio:** Expo AV (recording & playback)
 - **Text-to-Speech:** Expo Speech
-- **Storage:** AsyncStorage (local data persistence)
+- **Storage:** AsyncStorage (local persistence) + FileSystem (permanent images)
 - **Navigation:** React Navigation
-- **UI/UX:** Linear Gradients, Haptic Feedback, Smooth Animations
+- **UI/UX:** Expo Blur, Linear Gradients, Haptic Feedback, Smooth Animations
 
 ## 🚀 Getting Started
 
@@ -102,17 +115,20 @@ Open App → Home Screen (Memory Library)
    ↓
 Camera opens → Take photo OR upload from gallery
    ↓
-(Optional) Record 10-30 sec cooking sounds
+(Optional) Record 10-30 sec ambient sounds
    ↓
 AI analyzes → Generates scent description
    ↓
 User reviews/edits description + adds tags
    ↓
-"Save Memory" → Added to library
+"Save Memory" → Saved to permanent storage
    ↓
-Tap any memory → Full playback experience
+Tap any memory → Choose Ritual or Focus mode
    ↓
-Rate memory effectiveness (1-5 stars)
+Ritual Mode: Placement → Served → Take Bite → Completion (with fireworks!)
+Focus Mode: Zoom, pan, examine details
+   ↓
+View stats, badges, and streaks
 ```
 
 ## 🎨 Design Philosophy
@@ -142,15 +158,17 @@ Odora/
 │   ├── HomeScreen.js          # Memory library grid
 │   ├── CaptureScreen.js       # Camera + audio recording
 │   ├── DescriptionEditScreen.js # Edit AI description + tags
-│   └── PlaybackScreen.js      # Immersive playback experience
+│   ├── ARViewScreen.js        # Ritual + Focus modes, gamification
+│   └── PlaybackScreen.js      # Memory playback experience
 ├── services/
 │   ├── aiService.js           # OpenAI GPT-4 Vision integration
-│   └── storageService.js      # AsyncStorage operations
+│   ├── storageService.js      # AsyncStorage operations
+│   ├── fileService.js         # Permanent image storage
+│   └── ttsService.js          # Text-to-speech
 ├── constants/
 │   └── theme.js               # Colors, typography, spacing
 ├── assets/                     # Icons, splash screen
 ├── package.json
-├── app.json
 └── README.md
 ```
 
@@ -166,27 +184,74 @@ Odora/
 ### DescriptionEditScreen
 
 - AI-generated description editing
-- Tag selection (Breakfast, Mom's Cooking, etc.)
-- Save to local storage
+- Tag selection (Breakfast, Mom's Cooking, Dinner, etc.)
+- Save to permanent storage with image copy
+
+### ARViewScreen (Ritual + Focus)
+
+- **Ritual Mode:** 4-step immersive experience with animations
+- **Focus Mode:** Zoom and pan for detailed inspection
+- **Gamification:** Streaks, badges, firework celebrations
+- Scrollable content for completion screen
 
 ### PlaybackScreen
 
-- Immersive full-screen experience
-- Warm photo filter overlay
-- Looping ambient audio
-- Text-to-speech with calming voice
+- Memory overview with photo and audio
+- Navigate to Ritual/Focus modes
 - Star rating system
 
-## 🌟 Future Enhancements (Phase 2+)
+## 🎮 Gamification Details
 
-- [ ] Family invite system (collaborative descriptions)
+### Achievement Badges
+
+- 🍽️ **First Bite** — Complete 1 ritual
+- 🌟 **3-Day Warmth** — 3-day streak
+- 🔥 **7-Day Table Reunion** — 7-day streak
+- 💝 **Memory Keeper** — 10 total rituals
+- 👩‍🍳 **One Month with Mom's Cooking** — 30-day streak
+- 👨‍🍳 **Home Chef** — 50 total rituals
+
+### Streak Logic
+
+- **Same day:** No increment
+- **Consecutive day:** +1 to streak
+- **Gap > 1 day:** Reset to 1
+
+### Celebration Effects
+
+- **Fireworks:** 3 bursts with 30 particles each, radial explosion pattern
+- **Badge Popup:** Spring animation when new badge is earned
+- **Persistent Display:** Streak badge visible during ritual mode
+
+## 🌟 Future Enhancements
+
+- [ ] Cloud sync across devices
 - [ ] Share memory cards to social media
 - [ ] Search and filter memories by tags
-- [ ] Scent product recommendations (candles, incense)
-- [ ] Cloud sync across devices
 - [ ] Community memory sharing
-- [ ] ML-based scent prediction improvements
-- [ ] Voice-to-text for voice descriptions
+- [ ] More badge types and achievements
+- [ ] Custom ritual animations
+
+## 🧪 Developer Notes
+
+### Image Persistence
+
+Images are copied to `FileSystem.documentDirectory` at save time to ensure they persist across app restarts. Temporary camera URIs expire, so the `fileService.js` handles permanent storage.
+
+### Gamification Storage
+
+AsyncStorage keys used:
+
+- `ritual_streak` — Current consecutive days
+- `total_rituals` — Lifetime ritual count
+- `earned_badges` — Array of badge objects
+- `last_ritual_date` — Date string for streak validation
+
+### Known Issues
+
+- **Missing images?** Ensure the capture → save flow completes and the device has storage permissions
+- AI features require valid OpenAI API key and network access
+- Local-first app — no cloud sync currently implemented
 
 ## 🤝 Contributing
 
