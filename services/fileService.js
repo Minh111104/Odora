@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 /**
  * Copy an image from temporary location to permanent storage
@@ -11,7 +11,7 @@ export async function saveImagePermanently(tempUri) {
     const filename = `photo_${Date.now()}.jpg`;
     const permanentUri = `${FileSystem.documentDirectory}${filename}`;
 
-    // Copy the file from temp location to permanent storage
+    // Copy the file from temp location to permanent storage using legacy API
     await FileSystem.copyAsync({
       from: tempUri,
       to: permanentUri,
