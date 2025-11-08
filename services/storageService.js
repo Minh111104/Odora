@@ -145,3 +145,48 @@ export async function getMemoriesByTag(tag) {
     return [];
   }
 }
+
+/**
+ * Get all unique tags from memories
+ */
+export async function getAllTags() {
+  try {
+    const memories = await getAllMemories();
+    const tags = new Set();
+
+    memories.forEach(memory => {
+      if (memory.tags) {
+        memory.tags.forEach(tag => tags.add(tag));
+      }
+    });
+
+    return Array.from(tags).sort();
+  } catch (error) {
+    console.error('Error getting tags:', error);
+    return [];
+  }
+}
+
+/**
+ * Search memories by query (searches tags, descriptions, custom descriptions)
+ */
+export async function searchMemories(query) {
+  try {
+    if (!query.trim()) {
+      return await getAllMemories();
+    }
+
+    const memories = await getAllMemories();
+    const searchTerm = query.toLowerCase();
+
+    return memories.filter(memory => {
+      const matchesTags = memory.tags?.some(tag => tag.toLowerCase().includes(searchTerm));
+      const matchesDescription = memory.scentDescription?.toLowerCase().includes(searchTerm);
+      const matchesCustom = memory.customDescription?.toLowerCase().includes(searchTerm);
+      return matchesTags || matchesDescription || matchesCustom;
+    });
+  } catch (error) {
+    console.error('Error searching memories:', error);
+    return [];
+  }
+}
