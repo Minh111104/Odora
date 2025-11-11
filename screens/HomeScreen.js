@@ -10,11 +10,13 @@ import {
   StatusBar,
   TextInput,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { getAllMemories } from '../services/storageService';
+import * as Haptics from 'expo-haptics';
+import { getAllMemories, updateMemory } from '../services/storageService';
 import { colors, spacing, typography, shadows } from '../constants/theme';
 
 const { width } = Dimensions.get('window');
@@ -28,6 +30,7 @@ export default function HomeScreen({ navigation }) {
   const [selectedTags, setSelectedTags] = useState([]);
   const [allTags, setAllTags] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
     loadMemories();
@@ -99,6 +102,50 @@ export default function HomeScreen({ navigation }) {
   const clearFilters = () => {
     setSearchQuery('');
     setSelectedTags([]);
+  };
+
+  const deleteTagFromAllMemories = async tagToDelete => {
+    Alert.alert('Delete Tag', `Remove "${tagToDelete}" from all memories?`, [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+            // Update all memories that have this tag
+            const updatedMemories = await Promise.all(
+              memories.map(async memory => {
+                if (memory.tags && memory.tags.includes(tagToDelete)) {
+                  const newTags = memory.tags.filter(tag => tag !== tagToDelete);
+                  await updateMemory(memory.id, { tags: newTags });
+                  return { ...memory, tags: newTags };
+                }
+                return memory;
+              })
+            );
+
+            setMemories(updatedMemories);
+            setSelectedTags(selectedTags.filter(tag => tag !== tagToDelete));
+            setAllTags(allTags.filter(tag => tag !== tagToDelete));
+
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } catch (error) {
+            console.error('Error deleting tag:', error);
+            Alert.alert('Error', 'Failed to delete tag');
+          }
+        },
+      },
+    ]);
+  };
+
+  const toggleEditMode = () => {
+    setEditMode(!editMode);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const renderMemoryCard = ({ item }) => (
@@ -204,26 +251,54 @@ export default function HomeScreen({ navigation }) {
       {/* Tag Filter Pills */}
       {showFilters && allTags.length > 0 && (
         <BlurView intensity={80} tint="light" style={styles.tagFilterContainer}>
+          {/* Edit Mode Header */}
+          <View style={styles.tagFilterHeader}>
+            <Text style={styles.tagFilterTitle}>Filter by Tags</Text>
+            <TouchableOpacity onPress={toggleEditMode} style={styles.editModeButton}>
+              <Ionicons
+                name={editMode ? 'checkmark-circle' : 'trash-outline'}
+                size={20}
+                color={editMode ? colors.primary : colors.text}
+              />
+              <Text style={[styles.editModeText, editMode && styles.editModeTextActive]}>
+                {editMode ? 'Done' : 'Manage'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.tagScrollContent}
           >
             {allTags.map(tag => (
-              <TouchableOpacity
-                key={tag}
-                style={[styles.tagPill, selectedTags.includes(tag) && styles.tagPillActive]}
-                onPress={() => toggleTag(tag)}
-              >
-                <Text
+              <View key={tag} style={styles.tagPillWrapper}>
+                <TouchableOpacity
                   style={[
-                    styles.tagPillText,
-                    selectedTags.includes(tag) && styles.tagPillTextActive,
+                    styles.tagPill,
+                    selectedTags.includes(tag) && !editMode && styles.tagPillActive,
                   ]}
+                  onPress={() => !editMode && toggleTag(tag)}
+                  disabled={editMode}
                 >
-                  {tag}
-                </Text>
-              </TouchableOpacity>
+                  <Text
+                    style={[
+                      styles.tagPillText,
+                      selectedTags.includes(tag) && !editMode && styles.tagPillTextActive,
+                    ]}
+                  >
+                    {tag}
+                  </Text>
+                </TouchableOpacity>
+                {editMode && (
+                  <TouchableOpacity
+                    style={styles.deleteTagButton}
+                    onPress={() => deleteTagFromAllMemories(tag)}
+                  >
+                    <Ionicons name="close-circle" size={20} color="#FF3B30" />
+                  </TouchableOpacity>
+                )}
+              </View>
             ))}
           </ScrollView>
         </BlurView>
@@ -353,17 +428,48 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.9)',
     ...shadows.small,
   },
+  tagFilterHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
+  tagFilterTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  editModeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  editModeText: {
+    fontSize: 14,
+    color: colors.text,
+    marginLeft: spacing.xs,
+  },
+  editModeTextActive: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
   tagScrollContent: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     gap: spacing.sm,
+  },
+  tagPillWrapper: {
+    position: 'relative',
+    marginRight: spacing.xs,
   },
   tagPill: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: 16,
     backgroundColor: 'rgba(0,0,0,0.05)',
-    marginRight: spacing.xs,
   },
   tagPillActive: {
     backgroundColor: colors.primary,
@@ -375,6 +481,18 @@ const styles = StyleSheet.create({
   },
   tagPillTextActive: {
     color: '#FFF',
+  },
+  deleteTagButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...shadows.small,
   },
   resultsCount: {
     paddingHorizontal: spacing.lg,

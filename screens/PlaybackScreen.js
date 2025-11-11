@@ -9,15 +9,34 @@ import {
   Animated,
   Alert,
   Dimensions,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing, typography, shadows } from '../constants/theme';
-import { getMemoryById, rateMemory, deleteMemory } from '../services/storageService';
+import { getMemoryById, rateMemory, deleteMemory, updateMemory } from '../services/storageService';
 import { speakWithElevenLabs, isElevenLabsConfigured } from '../services/ttsService';
+
+const DEFAULT_COMMON_TAGS = [
+  'Breakfast',
+  "Mom's Cooking",
+  'Dinner',
+  'Holidays',
+  'Street Food',
+  'Dessert',
+  'Home',
+  'Comfort Food',
+];
+
+const COMMON_TAGS_KEY = '@odora_common_tags';
 
 const { width, height } = Dimensions.get('window');
 
@@ -30,12 +49,17 @@ export default function PlaybackScreen({ route, navigation }) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [ttsSound, setTtsSound] = useState(null);
   const [rating, setRating] = useState(null);
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [editingTags, setEditingTags] = useState([]);
+  const [customTagInput, setCustomTagInput] = useState('');
+  const [commonTags, setCommonTags] = useState(DEFAULT_COMMON_TAGS);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
   useEffect(() => {
     loadMemory();
+    loadCommonTags();
 
     // Entrance animation
     Animated.parallel([
@@ -67,6 +91,17 @@ export default function PlaybackScreen({ route, navigation }) {
     const data = await getMemoryById(memoryId);
     setMemory(data);
     setRating(data?.reminderRating);
+  };
+
+  const loadCommonTags = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(COMMON_TAGS_KEY);
+      if (stored) {
+        setCommonTags(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error('Error loading common tags:', error);
+    }
   };
 
   const playAmbientSound = async () => {
@@ -169,6 +204,57 @@ export default function PlaybackScreen({ route, navigation }) {
     }
   };
 
+  const openTagEditor = () => {
+    setEditingTags(memory.tags || []);
+    setShowTagModal(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const toggleTag = tag => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setEditingTags(prev => (prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]));
+  };
+
+  const addCustomTag = () => {
+    const trimmedTag = customTagInput.trim();
+
+    if (!trimmedTag) {
+      return;
+    }
+
+    if (editingTags.includes(trimmedTag)) {
+      Alert.alert('Duplicate Tag', 'This tag is already added');
+      return;
+    }
+
+    if (trimmedTag.length > 20) {
+      Alert.alert('Tag Too Long', 'Tags should be 20 characters or less');
+      return;
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setEditingTags(prev => [...prev, trimmedTag]);
+    setCustomTagInput('');
+  };
+
+  const removeCustomTag = tag => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setEditingTags(prev => prev.filter(t => t !== tag));
+  };
+
+  const saveTags = async () => {
+    try {
+      await updateMemory(memoryId, { tags: editingTags });
+      setMemory({ ...memory, tags: editingTags });
+      setShowTagModal(false);
+      setCustomTagInput('');
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.error('Error updating tags:', error);
+      Alert.alert('Error', 'Failed to update tags');
+    }
+  };
+
   const handleDelete = () => {
     Alert.alert(
       'Delete Memory',
@@ -253,15 +339,26 @@ export default function PlaybackScreen({ route, navigation }) {
         </Animated.View>
 
         {/* Tags */}
-        {memory.tags && memory.tags.length > 0 && (
-          <View style={styles.tagsContainer}>
-            {memory.tags.map((tag, index) => (
-              <View key={index} style={styles.tag}>
-                <Text style={styles.tagText}>{tag}</Text>
-              </View>
-            ))}
+        <View style={styles.tagsSection}>
+          <View style={styles.tagsSectionHeader}>
+            <Text style={styles.tagsSectionTitle}>Tags</Text>
+            <TouchableOpacity onPress={openTagEditor} style={styles.editTagsButton}>
+              <Ionicons name="create-outline" size={20} color={colors.primary} />
+              <Text style={styles.editTagsText}>Edit</Text>
+            </TouchableOpacity>
           </View>
-        )}
+          {memory.tags && memory.tags.length > 0 ? (
+            <View style={styles.tagsContainer}>
+              {memory.tags.map((tag, index) => (
+                <View key={index} style={styles.tag}>
+                  <Text style={styles.tagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.noTagsText}>No tags added yet</Text>
+          )}
+        </View>
 
         {/* Description Card */}
         <View style={styles.descriptionCard}>
@@ -360,6 +457,141 @@ export default function PlaybackScreen({ route, navigation }) {
           )}
         </View>
       </ScrollView>
+
+      {/* Tag Editor Modal */}
+      <Modal
+        visible={showTagModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowTagModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowTagModal(false)}
+          />
+          <View style={styles.modalContent}>
+            <BlurView intensity={100} tint="light" style={styles.modalBlur}>
+              {/* Modal Header */}
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Edit Tags</Text>
+                <TouchableOpacity onPress={() => setShowTagModal(false)}>
+                  <Ionicons name="close" size={28} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+                {/* Common Tags */}
+                <Text style={styles.modalSectionTitle}>Common Tags</Text>
+                <Text style={styles.modalHint}>Tap to add or remove tags</Text>
+                <View style={styles.modalTagsContainer}>
+                  {commonTags.map(tag => (
+                    <TouchableOpacity
+                      key={tag}
+                      style={[
+                        styles.modalTag,
+                        editingTags.includes(tag) && styles.modalTagSelected,
+                      ]}
+                      onPress={() => toggleTag(tag)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.modalTagText,
+                          editingTags.includes(tag) && styles.modalTagTextSelected,
+                        ]}
+                      >
+                        {tag}
+                      </Text>
+                      {editingTags.includes(tag) && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={16}
+                          color="#FFF"
+                          style={{ marginLeft: 4 }}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Custom Tag Input */}
+                <Text style={styles.modalSectionTitle}>Create Custom Tag</Text>
+                <View style={styles.customTagInputContainer}>
+                  <TextInput
+                    style={styles.customTagInput}
+                    value={customTagInput}
+                    onChangeText={setCustomTagInput}
+                    placeholder="e.g., Grandma's Recipe, Spicy..."
+                    placeholderTextColor={colors.textLight}
+                    maxLength={20}
+                    returnKeyType="done"
+                    onSubmitEditing={addCustomTag}
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.addTagButton,
+                      !customTagInput.trim() && styles.addTagButtonDisabled,
+                    ]}
+                    onPress={addCustomTag}
+                    disabled={!customTagInput.trim()}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name="add-circle"
+                      size={32}
+                      color={customTagInput.trim() ? colors.primary : colors.textLight}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Selected Custom Tags */}
+                {editingTags.filter(tag => !commonTags.includes(tag)).length > 0 && (
+                  <>
+                    <Text style={styles.modalSectionTitle}>Your Custom Tags</Text>
+                    <View style={styles.modalTagsContainer}>
+                      {editingTags
+                        .filter(tag => !commonTags.includes(tag))
+                        .map(tag => (
+                          <View key={tag} style={[styles.modalTag, styles.modalCustomTag]}>
+                            <Text style={[styles.modalTagText, styles.modalCustomTagText]}>
+                              {tag}
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => removeCustomTag(tag)}
+                              style={styles.removeTagButton}
+                            >
+                              <Ionicons name="close-circle" size={18} color="#FFF" />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                    </View>
+                  </>
+                )}
+              </ScrollView>
+
+              {/* Save Button */}
+              <TouchableOpacity
+                style={styles.saveTagsButton}
+                onPress={saveTags}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={[colors.primary, colors.accent]}
+                  style={styles.saveTagsGradient}
+                >
+                  <Ionicons name="checkmark-circle" size={24} color="#FFF" />
+                  <Text style={styles.saveTagsText}>Save Tags</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </BlurView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -426,10 +658,37 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 350,
   },
+  tagsSection: {
+    marginBottom: spacing.lg,
+  },
+  tagsSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  tagsSectionTitle: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  editTagsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 12,
+  },
+  editTagsText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: spacing.xs,
+  },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: spacing.md,
   },
   tag: {
     backgroundColor: 'rgba(255,255,255,0.9)',
@@ -443,6 +702,11 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 12,
     fontWeight: '600',
+  },
+  noTagsText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    fontStyle: 'italic',
   },
   descriptionCard: {
     backgroundColor: 'rgba(255,255,255,0.95)',
@@ -555,5 +819,137 @@ const styles = StyleSheet.create({
     color: '#FFF',
     textAlign: 'center',
     marginTop: 100,
+  },
+  // Modal Styles
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+    maxHeight: '80%',
+  },
+  modalBlur: {
+    padding: spacing.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalTitle: {
+    ...typography.h2,
+    color: colors.text,
+  },
+  modalScroll: {
+    maxHeight: 450,
+  },
+  modalSectionTitle: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  modalHint: {
+    fontSize: 12,
+    color: colors.textLight,
+    marginBottom: spacing.sm,
+    fontStyle: 'italic',
+  },
+  modalTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: spacing.md,
+  },
+  modalTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    marginRight: spacing.sm,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.textLight,
+  },
+  modalTagSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  modalTagText: {
+    ...typography.small,
+    color: colors.text,
+  },
+  modalTagTextSelected: {
+    color: '#FFF',
+    fontWeight: '600',
+  },
+  customTagInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  customTagInput: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 12,
+    padding: spacing.md,
+    ...typography.body,
+    color: colors.text,
+    marginRight: spacing.sm,
+    ...shadows.small,
+  },
+  addTagButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addTagButtonDisabled: {
+    opacity: 0.3,
+  },
+  modalCustomTag: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: spacing.xs,
+  },
+  modalCustomTagText: {
+    color: '#FFF',
+    fontWeight: '600',
+    marginRight: spacing.xs,
+  },
+  removeTagButton: {
+    marginLeft: spacing.xs,
+  },
+  saveTagsButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: spacing.md,
+    ...shadows.medium,
+  },
+  saveTagsGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.md,
+  },
+  saveTagsText: {
+    color: '#FFF',
+    ...typography.body,
+    fontWeight: '600',
+    marginLeft: spacing.sm,
   },
 });
