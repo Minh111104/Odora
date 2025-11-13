@@ -296,18 +296,186 @@ export default function ARViewScreen({ route, navigation }) {
   };
 
   const checkAndAwardBadges = (streak, total) => {
+    const now = new Date();
+    const hour = now.getHours();
+    const day = now.getDay();
+
     const availableBadges = [
-      { id: 'first_ritual', name: 'First Bite', icon: '🍽️', condition: total >= 1 },
-      { id: 'three_days', name: '3-Day Warmth', icon: '🌟', condition: streak >= 3 },
-      { id: 'week_streak', name: '7-Day Table Reunion', icon: '🔥', condition: streak >= 7 },
-      { id: 'ten_rituals', name: 'Memory Keeper', icon: '💝', condition: total >= 10 },
+      // Milestone Badges
+      {
+        id: 'first_ritual',
+        name: 'First Bite',
+        icon: '🍽️',
+        description: 'Started your journey',
+        condition: total >= 1,
+      },
+      {
+        id: 'five_rituals',
+        name: 'Getting Started',
+        icon: '🌱',
+        description: '5 rituals completed',
+        condition: total >= 5,
+      },
+      {
+        id: 'ten_rituals',
+        name: 'Memory Keeper',
+        icon: '💝',
+        description: '10 rituals completed',
+        condition: total >= 10,
+      },
+      {
+        id: 'twenty_five_rituals',
+        name: 'Devoted Diner',
+        icon: '🎖️',
+        description: '25 rituals completed',
+        condition: total >= 25,
+      },
+      {
+        id: 'fifty_rituals',
+        name: 'Home Chef',
+        icon: '👨‍🍳',
+        description: '50 rituals completed',
+        condition: total >= 50,
+      },
+      {
+        id: 'hundred_rituals',
+        name: 'Master of Memories',
+        icon: '🏆',
+        description: '100 rituals completed',
+        condition: total >= 100,
+      },
+      {
+        id: 'two_hundred_rituals',
+        name: 'Legendary Foodie',
+        icon: '👑',
+        description: '200 rituals completed',
+        condition: total >= 200,
+      },
+
+      // Streak Badges
+      {
+        id: 'three_days',
+        name: '3-Day Warmth',
+        icon: '🌟',
+        description: '3-day streak',
+        condition: streak >= 3,
+      },
+      {
+        id: 'week_streak',
+        name: '7-Day Table Reunion',
+        icon: '🔥',
+        description: '7-day streak',
+        condition: streak >= 7,
+      },
+      {
+        id: 'two_week_streak',
+        name: 'Fortnight Feast',
+        icon: '🔥🔥',
+        description: '14-day streak',
+        condition: streak >= 14,
+      },
       {
         id: 'month_streak',
         name: "One Month with Mom's Cooking",
         icon: '👩‍🍳',
+        description: '30-day streak',
         condition: streak >= 30,
       },
-      { id: 'fifty_rituals', name: 'Home Chef', icon: '👨‍🍳', condition: total >= 50 },
+      {
+        id: 'two_month_streak',
+        name: 'Kitchen Devotee',
+        icon: '💪',
+        description: '60-day streak',
+        condition: streak >= 60,
+      },
+      {
+        id: 'three_month_streak',
+        name: 'Culinary Commitment',
+        icon: '💎',
+        description: '90-day streak',
+        condition: streak >= 90,
+      },
+      {
+        id: 'half_year_streak',
+        name: 'Half Year of Homecoming',
+        icon: '🌈',
+        description: '180-day streak',
+        condition: streak >= 180,
+      },
+      {
+        id: 'year_streak',
+        name: 'Full Year of Memories',
+        icon: '🎊',
+        description: '365-day streak',
+        condition: streak >= 365,
+      },
+
+      // Time-Based Badges
+      {
+        id: 'early_bird',
+        name: 'Early Bird',
+        icon: '🌅',
+        description: 'Ritual before 8 AM',
+        condition: hour >= 5 && hour < 8,
+      },
+      {
+        id: 'breakfast_champion',
+        name: 'Breakfast Champion',
+        icon: '🥐',
+        description: 'Morning ritual',
+        condition: hour >= 6 && hour < 11,
+      },
+      {
+        id: 'lunch_lover',
+        name: 'Lunch Lover',
+        icon: '🍱',
+        description: 'Midday ritual',
+        condition: hour >= 11 && hour < 15,
+      },
+      {
+        id: 'dinner_devotee',
+        name: 'Dinner Devotee',
+        icon: '🍽️',
+        description: 'Evening ritual',
+        condition: hour >= 17 && hour < 21,
+      },
+      {
+        id: 'midnight_snacker',
+        name: 'Midnight Snacker',
+        icon: '🌙',
+        description: 'Late night ritual',
+        condition: hour >= 23 || hour < 5,
+      },
+      {
+        id: 'weekend_warrior',
+        name: 'Weekend Warrior',
+        icon: '🎉',
+        description: 'Weekend ritual',
+        condition: day === 0 || day === 6,
+      },
+
+      // Special Achievement Badges
+      {
+        id: 'consistent_ten',
+        name: 'Consistency King',
+        icon: '⚡',
+        description: '10+ streak achieved',
+        condition: streak >= 10,
+      },
+      {
+        id: 'dedicated_twenty',
+        name: 'Dedication Master',
+        icon: '💫',
+        description: '20+ streak achieved',
+        condition: streak >= 20,
+      },
+      {
+        id: 'perfect_month',
+        name: 'Perfect Month',
+        icon: '🌕',
+        description: 'One full month streak',
+        condition: streak >= 30,
+      },
     ];
 
     const newBadges = [...badges];
@@ -594,15 +762,34 @@ export default function ARViewScreen({ route, navigation }) {
                       {/* Recent Badges */}
                       {badges.length > 0 && (
                         <View style={styles.badgesContainer}>
-                          <Text style={styles.badgesTitle}>Your Badges</Text>
-                          <View style={styles.badgesList}>
-                            {badges.slice(-3).map(badge => (
-                              <View key={badge.id} style={styles.badgeItem}>
-                                <Text style={styles.badgeIcon}>{badge.icon}</Text>
-                                <Text style={styles.badgeName}>{badge.name}</Text>
-                              </View>
-                            ))}
-                          </View>
+                          <Text style={styles.badgesTitle}>
+                            Recent Badges ({badges.length} total)
+                          </Text>
+                          <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.badgesScrollContent}
+                          >
+                            {badges
+                              .slice(-5)
+                              .reverse()
+                              .map(badge => (
+                                <View key={badge.id} style={styles.badgeItem}>
+                                  <Text style={styles.badgeIcon}>{badge.icon}</Text>
+                                  <Text style={styles.badgeName}>{badge.name}</Text>
+                                  {badge.description && (
+                                    <Text style={styles.badgeDescription}>{badge.description}</Text>
+                                  )}
+                                </View>
+                              ))}
+                          </ScrollView>
+                          <TouchableOpacity
+                            style={styles.viewAllBadgesButton}
+                            onPress={() => navigation.navigate('Home')}
+                          >
+                            <Text style={styles.viewAllBadgesText}>View All Badges</Text>
+                            <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+                          </TouchableOpacity>
                         </View>
                       )}
 
@@ -1571,6 +1758,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
+  badgesScrollContent: {
+    paddingHorizontal: spacing.md,
+  },
   badgesList: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -1579,19 +1769,46 @@ const styles = StyleSheet.create({
   },
   badgeItem: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    padding: spacing.sm,
-    borderRadius: 12,
-    minWidth: 80,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    padding: spacing.md,
+    borderRadius: 16,
+    minWidth: 100,
+    marginRight: spacing.sm,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   badgeIcon: {
-    fontSize: 32,
-    marginBottom: 4,
+    fontSize: 36,
+    marginBottom: spacing.xs,
   },
   badgeName: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.8)',
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FFF',
     textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  badgeDescription: {
+    fontSize: 9,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+  },
+  viewAllBadgesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    alignSelf: 'center',
+  },
+  viewAllBadgesText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
+    marginRight: spacing.xs,
   },
   fireworkParticle: {
     position: 'absolute',
