@@ -228,8 +228,6 @@ Odora/
 - [ ] Cloud sync across devices
 - [ ] Share memory cards to social media
 - [ ] Community memory sharing
-- [ ] More badge types and achievements
-- [ ] Custom ritual animations
 
 ## 🧪 Developer Notes
 
