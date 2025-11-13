@@ -208,8 +208,17 @@ export default function HomeScreen({ navigation }) {
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Odora</Text>
-        <Text style={styles.headerSubtitle}>Your Scent Memory Journal</Text>
+        <View>
+          <Text style={styles.headerTitle}>Odora</Text>
+          <Text style={styles.headerSubtitle}>Your Scent Memory Journal</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.settingsButton}
+          onPress={() => navigation.navigate('Settings')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="settings-outline" size={24} color={colors.text} />
+        </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
@@ -356,9 +365,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingTop: spacing.xxl,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
+  },
+  settingsButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 22,
+    backgroundColor: colors.cardBg,
   },
   headerTitle: {
     ...typography.h1,

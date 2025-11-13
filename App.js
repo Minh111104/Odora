@@ -6,6 +6,7 @@ import CaptureScreen from './screens/CaptureScreen';
 import DescriptionEditScreen from './screens/DescriptionEditScreen';
 import PlaybackScreen from './screens/PlaybackScreen';
 import ARViewScreen from './screens/ARViewScreen';
+import SettingsScreen from './screens/SettingsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -28,6 +29,7 @@ export default function App() {
           component={ARViewScreen}
           options={{ animation: 'slide_from_bottom' }}
         />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
