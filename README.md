@@ -269,7 +269,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Expo team for the amazing framework
 - All the homesick students who inspired this project
 
-## 📞 Contact
+## 📞 Credit
 
 Created by [@Minh111104](https://github.com/Minh111104)
 
