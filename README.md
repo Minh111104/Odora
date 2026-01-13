@@ -4,7 +4,7 @@
 
 Odora is a mobile app designed to help homesick students recreate scent memories through multisensory triggers. Using AI-generated descriptions and ambient sounds, we bring students closer to home—one meal at a time.
 
-## 🎯 The Problem
+## 🎯 Problem
 
 International students often miss the familiar scents of home-cooked meals. While we can't digitize smell (yet), Odora does something better: it helps your brain recreate smell memories through multisensory experiences.
 
