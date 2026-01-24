@@ -16,37 +16,37 @@
         │                     │                     │
         ▼                     ▼                     ▼
 ┌───────────────┐    ┌────────────────┐   ┌──────────────────┐
-│  HomeScreen   │───>│ CaptureScreen  │──>│DescriptionEdit  │
+│  HomeScreen   │───>│ CaptureScreen  │──>│DescriptionEdit   │
 │               │    │                │   │    Screen        │
 │ - Memory Grid │    │ - Camera       │   │                  │
 │ - Search/Tags │    │ - Audio Rec    │   │ - Edit AI Text   │
 │ - Settings    │    │ - Photo Preview│   │ - Add Tags       │
 │ - FAB Button  │    │ - Processing   │   │ - Save Memory    │
 └───────┬───────┘    └────────────────┘   └────────┬─────────┘
-      │                                           │
-      │            ┌──────────────────┐          │
-      └───────────>│ PlaybackScreen   │<─────────┘
-               │                  │
-               │ - Photo Display  │
-               │ - Audio Playback │
-               │ - TTS (11Labs/Expo)|
-               │ - Star Rating    │
-               │ - 3D View (AR)   │
-               └─────────┬────────┘
-                       │
-                       ▼
-                  ┌────────────┐
-                  │ ARViewScreen│
-                  │ - Ritual/Zoom│
-                  │ - Streak/Badges│
-                  └────────────┘
-                       ▲
-                       │
-                  ┌────────────┐
-                  │ Settings   │
-                  │ - Data Mgmt│
-                  │ - Stats    │
-                  └────────────┘
+        │                                          │
+        │            ┌──────────────────┐          │
+        └───────────>│ PlaybackScreen   │<─────────┘
+                     │                  │
+                     │ - Photo Display  │
+                     │ - Audio Playback │
+                     │ - TTS 11Labs/Expo|
+                     │ - Star Rating    │
+                     │ - 3D View (AR)   │
+                     └─────────┬────────┘
+                               │
+                               ▼
+                       ┌────────────┐
+                       │ARViewScreen│
+                       │ Ritual/Zoom│
+                       │Streak/Badges│
+                       └────────────┘
+                              ▲
+                              │
+                       ┌────────────┐
+                       │ Settings   │
+                       │ - Data Mgmt│
+                       │ - Stats    │
+                       └────────────┘
 ```
 
 ## Service Layer Architecture
@@ -55,13 +55,13 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                      SCREENS LAYER                          │
 │  HomeScreen | CaptureScreen | DescriptionEditScreen |       │
-│             PlaybackScreen                                   │
+│             PlaybackScreen                                  │
 └────────────────────┬────────────────────────────────────────┘
                      │
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    SERVICES LAYER                           │
-│                                                              │
+│                                                             │
 │  ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐ │
 │  │  aiService.js    │   │ storageService.js│   │  fileService.js  │   │  ttsService.js    │ │
 │  │                  │   │                  │   │                  │   │                  │ │
