@@ -1,4 +1,4 @@
-# 🌸 Odora — Scent Memory Journal 💭
+# Odora — Scent Memory Journal 💭
 
 **Because sometimes, remembering how something smelled is just as powerful as smelling it again.**
 
